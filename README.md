@@ -1,125 +1,240 @@
-# FedRAMP RFP Assistant (FastAPI + HTMX/Tailwind)
+# MicroTech Platform
 
-Clean, fast, **no-nonsense** RFP assistant for parsing proposals, building a checklist of deliverables,
-and generating a FedRAMP‑only draft response + exportable PDF. The UI mirrors the reference layout:
-**left sidebar** (RFPs / runs / checklist) and **right content** (Checklist, Draft, PDF Preview).
+> **Professional FedRAMP Proposal Assistance and Recruiting Platform**
 
-> ⚠️ This is an MVP scaffold designed to run locally out‑of‑the‑box.  
-> - SharePoint is **stubbed** with working endpoints and clear TODOs for Microsoft Graph.  
-> - The LLM adapter now uses **OpenAI** exclusively via `OPENAI_KEY`.  
-> - If no provider credentials are present, the app runs in **mock mode** for demos/tests.
+A comprehensive, enterprise-grade platform built with modern React frontend, Node.js backend, and Azure cloud infrastructure. Designed to streamline proposal management and recruiting workflows with AI-powered assistance.
 
----
+## 🚀 Quick Start
 
-## Features
+### Option 1: WSL/Ubuntu (Recommended)
+```bash
+# 1. Install prerequisites
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+npm install -g pnpm@8
 
-- 🗂️ **Drag‑and‑drop** file upload (PDF/DOCX), plus **SharePoint** list/download stubs
-- 🧹 **Document normalizer** → clean text from PDFs/DOCX
-- 🧩 **RFP requirement parser** → structured JSON checklist (must/should, due, artifact type)
-- 🛡️ **FedRAMP‑only** synthesis guard (prompts constrained to supplied KB/context)
-- 📝 **Draft answer** generator (respects "house rules")
-- ✅ **Editable checklist** in UI (add/remove/update items)
-- 🧾 **PDF export** of final response (ReportLab)
-- 🧠 **LLM adapter**: `gpt-oss` (20b) and `openai` (via `.env`), or **mock** if keys unset
-- 🗃️ **SQLite** for runs, artifacts, and checklist items
-- 🧰 **FastAPI** backend, **HTMX + Tailwind** for fast/crisp UI without heavy JS frameworks
+# 2. Clone and setup
+git clone <your-repo-url>
+cd fedramp_rfp_assistant
 
----
+# 3. Automated setup and start
+chmod +x scripts/*.sh
+./scripts/setup.sh
+./scripts/start-dev.sh
+```
 
-## Quickstart
+### Option 2: Windows with WSL
+```powershell
+# Run the PowerShell helper script
+.\start-wsl.ps1
+# Follow the interactive prompts
+```
 
-### 1) Requirements
-- Python 3.10+
-- (Optional) wkhtmltopdf **not required**. We use ReportLab.
+### Option 3: Manual Setup
+```bash
+# Install dependencies
+pnpm install
 
-### 2) Setup
+# Build packages
+pnpm build
+
+# Setup environment
+cp env.example .env
+# Edit .env with your configuration
+
+# Start development servers
+pnpm dev
+```
+
+### Access URLs
+- **Web Application**: http://localhost:5173
+- **API Server**: http://localhost:3000
+- **API Documentation**: http://localhost:3000/docs
+
+### Quick Commands
+```bash
+# Run all tests
+./scripts/test.sh
+
+# Run tests with coverage
+./scripts/test.sh --coverage
+
+# Run linting
+pnpm lint
+```
+
+## 📁 Project Structure
+
+```
+microtech-platform/
+├── apps/                          # Applications
+│   ├── web/                       # React frontend application
+│   │   ├── src/
+│   │   │   ├── components/        # React components
+│   │   │   ├── pages/            # Page components
+│   │   │   ├── store/            # Zustand state management
+│   │   │   ├── design/           # Design tokens and themes
+│   │   │   └── test/             # Test setup and utilities
+│   │   ├── package.json
+│   │   ├── vite.config.ts        # Vite configuration
+│   │   ├── tailwind.config.js    # TailwindCSS configuration
+│   │   └── tsconfig.json         # TypeScript configuration
+│   └── api/                       # Node.js backend API
+│       ├── src/
+│       │   ├── routes/           # API route handlers
+│       │   ├── middleware/       # Express middleware
+│       │   ├── config/           # Configuration files
+│       │   ├── utils/            # Utility functions
+│       │   └── test/             # API tests
+│       ├── package.json
+│       └── tsconfig.json
+├── packages/                      # Shared packages
+│   ├── ui/                        # Shared UI components (shadcn/ui)
+│   ├── core/                      # Domain models and utilities
+│   ├── ai/                        # AI service integration
+│   └── pdf/                       # PDF processing utilities
+├── infrastructure/                # Azure Infrastructure as Code
+│   └── bicep/                     # Bicep templates
+├── .github/                       # GitHub Actions CI/CD
+│   └── workflows/                 # Deployment workflows
+├── config/                        # Shared configuration
+│   ├── eslint/                    # ESLint configuration
+│   ├── prettier/                  # Prettier configuration
+│   └── tsconfig/                  # TypeScript configuration
+└── docs/                          # Documentation
+    ├── API_DOCUMENTATION.md
+    ├── DEPLOYMENT.md
+    ├── SECURITY.md
+    └── USER_GUIDE.md
+```
+
+## 🏗️ Architecture
+
+### Frontend (React + TypeScript)
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite for fast development and building
+- **Styling**: TailwindCSS with shadcn/ui components
+- **State Management**: Zustand for lightweight state management
+- **Routing**: React Router for client-side routing
+- **Testing**: Vitest + React Testing Library
+
+### Backend (Node.js + TypeScript)
+- **Runtime**: Node.js with TypeScript
+- **Framework**: Fastify for high-performance API server
+- **Database**: Prisma ORM with Azure Cosmos DB
+- **Authentication**: JWT-based authentication
+- **File Storage**: Azure Blob Storage
+- **Documentation**: Swagger/OpenAPI
+
+### Infrastructure (Azure)
+- **Compute**: Azure App Service for API, Static Web Apps for frontend
+- **Database**: Azure Cosmos DB for document storage
+- **Storage**: Azure Blob Storage for file uploads
+- **Secrets**: Azure Key Vault for secure configuration
+- **Monitoring**: Azure Application Insights
+- **IaC**: Bicep templates for infrastructure provisioning
+
+## 🎯 Key Features
+
+### Proposal Management
+- **3-Column Workspace**: Checklist, Draft Editor, Change Log
+- **AI-Powered Chat**: Context-aware AI assistant for live editing
+- **Document Processing**: Upload and analyze PDF/DOCX files
+- **Interactive Checklists**: Auto-generated from document analysis
+- **Real-time Collaboration**: Multi-user editing with change tracking
+- **Export Capabilities**: PDF/DOCX export with professional formatting
+
+### Recruiting Workflow
+- **Candidate Analysis**: Resume vs. job description matching
+- **Skills Assessment**: Automated skills gap analysis
+- **Report Generation**: Comprehensive evaluation reports
+- **Template Management**: Reusable email and document templates
+
+### Platform Features
+- **Professional UI**: Clean, modern design with MicroTech branding
+- **Responsive Design**: Mobile-first approach with desktop optimization
+- **Accessibility**: WCAG 2.1 AA compliance
+- **Performance**: Optimized for large documents and concurrent users
+- **Security**: Enterprise-grade security with Azure integration
+
+## 🔧 Development Commands
 
 ```bash
-# from the project root
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# Install dependencies
+pnpm install
 
-pip install -r requirements.txt
-cp .env.example .env
-# edit .env to set your provider and keys
+# Development mode
+pnpm dev                    # Start all apps in development mode
+pnpm --filter web dev       # Start only web app
+pnpm --filter api dev       # Start only API
+
+# Building
+pnpm build                  # Build all packages and apps
+pnpm --filter web build     # Build only web app
+pnpm --filter api build     # Build only API
+
+# Testing
+pnpm test                   # Run all tests
+pnpm test:coverage          # Run tests with coverage
+pnpm --filter web test      # Test only web app
+pnpm --filter api test      # Test only API
+
+# Code Quality
+pnpm lint                   # Lint all code
+pnpm format                 # Format all code
+pnpm typecheck              # Type check all TypeScript
+
+# Database
+pnpm --filter api db:generate  # Generate Prisma client
+pnpm --filter api db:migrate   # Run database migrations
+pnpm --filter api db:push      # Push schema changes
 ```
 
-### 3) Run
+## 🚀 Deployment
 
+### Local Development
 ```bash
-uvicorn app.main:app --reload
+# Start both frontend and backend
+pnpm dev
 ```
 
-Open http://127.0.0.1:8000
+### Azure Deployment
+```bash
+# Deploy infrastructure
+cd infrastructure/bicep
+az group create --name rg-microtech-prod --location eastus
+az deployment group create --resource-group rg-microtech-prod --template-file main.bicep
 
-### 4) LLM Configuration (OpenAI only)
-
-Set these in `.env`:
-
-- `OPENAI_KEY=` (leave empty, then paste your key later)
-- `OPENAI_MODEL=gpt-4o-mini` (or your choice)
-
-If `OPENAI_KEY` is not set, the app uses a simple **mock mode** placeholder response.
-
-### 5) SharePoint (stub → Graph)
-
-- Update `.env`:
-  - `SP_TENANT_ID=...`
-  - `SP_CLIENT_ID=...`
-  - `SP_CLIENT_SECRET=...`
-  - `SP_SITE_ID=...`
-
-Endpoints are implemented with clear TODOs and graceful failures if unset.
-
----
-
-## Project Structure
-
-```
-fedramp_rfp_assistant/
-├─ app/
-│  ├─ main.py                # FastAPI app & routes
-│  ├─ models.py              # SQLModel ORM models
-│  ├─ db.py                  # DB init/session helpers
-│  ├─ llm/
-│  │   ├─ adapter.py         # Unified LLM interface (gpt-oss/openai/mock)
-│  │   └─ prompts.py         # System/user prompts (FedRAMP guard, parsing, synthesis)
-│  ├─ services/
-│  │   ├─ normalize.py       # PDF/DOCX → clean text
-│  │   ├─ parse_requirements.py # Extract deliverables → JSON checklist
-│  │   ├─ synthesize.py      # Draft response generator
-│  │   ├─ export_pdf.py      # ReportLab export
-│  │   └─ sharepoint.py      # SharePoint stubs + Graph TODOs
-│  ├─ templates/
-│  │   ├─ base.html
-│  │   └─ index.html
-│  └─ static/
-│      └─ app.css            # Minimal CSS (Tailwind via CDN in templates)
-├─ fedramp_kb/               # Put your FedRAMP reference .md/.txt here
-│  └─ README.md
-├─ .env.example
-├─ requirements.txt
-└─ README.md
+# Deploy applications via GitHub Actions
+git push origin main
 ```
 
+## 📚 Documentation
+
+- [API Documentation](./API_DOCUMENTATION.md) - Complete API reference
+- [Deployment Guide](./DEPLOYMENT.md) - Azure deployment instructions
+- [Security Guide](./SECURITY.md) - Security measures and compliance
+- [User Guide](./USER_GUIDE.md) - End-user documentation
+- [Contributing Guide](./CONTRIBUTING.md) - Development guidelines
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the Apache-2.0 License - see the [LICENSE](./LICENSE) file for details.
+
+## 🆘 Support
+
+- **Issues**: [GitHub Issues](https://github.com/your-org/microtech-platform/issues)
+- **Documentation**: [Project Wiki](https://github.com/your-org/microtech-platform/wiki)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/microtech-platform/discussions)
+
 ---
 
-## Design Notes
-
-- **Deterministic graph:** while we’re not wiring LangGraph here, functions are cleanly separated so you can wrap them in a graph/orchestrator later.
-- **Schemas everywhere:** parser & checklist return typed dicts for stability.
-- **FedRAMP‑only:** The synthesizer is **always** grounded with KB text and a strict system prompt; it refuses to answer outside that domain.
-- **Performance:** minimal deps, single pass parsers, and cached DB rows by `run_id`.
-
----
-
-## Disclaimer
-
-This is sample code for demonstration. Validate outputs with your compliance team.
-Integrations (SharePoint/Graph, provider URLs) are your responsibility.
-
----
-
-## License
-
-Apache-2.0
+**Built with ❤️ by the MicroTech Team**

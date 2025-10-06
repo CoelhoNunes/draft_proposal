@@ -1,0 +1,21 @@
+# Global code owners
+* @your-github-username
+
+# Frontend specific
+apps/web/ @your-github-username
+packages/ui/ @your-github-username
+
+# Backend specific
+apps/api/ @your-github-username
+packages/core/ @your-github-username
+packages/ai/ @your-github-username
+packages/pdf/ @your-github-username
+
+# Infrastructure
+infrastructure/ @your-github-username
+.github/workflows/ @your-github-username
+
+# Configuration
+config/ @your-github-username
+package.json @your-github-username
+pnpm-workspace.yaml @your-github-username
