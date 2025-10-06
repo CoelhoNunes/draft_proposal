@@ -11,7 +11,7 @@ import {
   Plus,
   Trash2
 } from 'lucide-react';
-import { callOpenAI } from '../api/openai';
+import { callOpenAI, analyzePdf } from '../api/openai';
 
 // Simple components
 const Card = ({ children, className }: any) => (
@@ -64,9 +64,15 @@ export function ProposalPage() {
   const [showSuggestionConfirmation, setShowSuggestionConfirmation] = useState(false);
   const [llmChanges, setLlmChanges] = useState<any[]>([]);
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
+  const [pdfProcessed, setPdfProcessed] = useState<string | null>(null);
   const [savedProposals, setSavedProposals] = useState<string[]>([]);
   const [chatPanelHeight, setChatPanelHeight] = useState(200);
   const [isResizing, setIsResizing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [currentRunName, setCurrentRunName] = useState<string>('');
+  const [showRunNameModal, setShowRunNameModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [archivedRuns, setArchivedRuns] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
 
@@ -140,243 +146,171 @@ export function ProposalPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      setIsLoading(true);
-      try {
-        console.log('Files selected:', files);
+      const file = files[0];
+      
+      // Clear previous LLM suggestions for new run
+      setLlmChanges([]);
+      
+      // Show run name modal
+      setPendingFile(file);
+      setShowRunNameModal(true);
+    }
+  };
+
+  const handleRunNameSubmit = async () => {
+    if (!pendingFile || !currentRunName.trim()) return;
+    
+    setIsLoading(true);
+    try {
+      console.log('Processing file:', pendingFile.name, 'for run:', currentRunName);
+
+      // Ask LLM to analyze PDF contextually (backend must fetch pages/content server-side)
+      const result = await analyzePdf(pendingFile);
+
+      // Store uploaded PDF for review
+      setUploadedPdf(pendingFile);
         
-        // Simulate LLM analysis of PDF content
-        const aiResponse = await callOpenAI(`Analyze this FedRAMP document and extract key requirements: ${files[0].name}`);
-        
-        // Store uploaded PDF for review
-        setUploadedPdf(files[0]);
-        
-        // Generate comprehensive checklist items from PDF analysis
-        const pdfRequirements = [
-          {
-            id: Date.now() + 1,
-            label: 'Multi-factor authentication implementation for all user accounts',
+        // Use checklist items from API response if available
+        if (result.checklistItems) {
+          setChecklistItems(result.checklistItems);
+        } else {
+          // Parse LLM response into checklist items using labeled sections
+          const lines = result.content.split('\n').map(l => l.trim());
+          const startChecklist = lines.findIndex(l => /^Checklist:?$/i.test(l));
+          const startDeliverables = lines.findIndex(l => /^Deliverables:?$/i.test(l));
+          const checklistSlice = startChecklist !== -1 ? lines.slice(startChecklist + 1, startDeliverables !== -1 ? startDeliverables : undefined) : [];
+          const requirementLines = checklistSlice.filter(l => l).map(l => l.replace(/^\d+\.?\s*/, ''));
+          const pdfRequirements = requirementLines.slice(0, 50).map((label, idx) => ({
+            id: Date.now() + idx + 1,
+            title: label.replace(/^\d+\.?\s*/, '').replace(/\*\*/g, '').replace(/\*/g, ''),
+            summary: `Summary for ${label}`,
             status: 'pending',
-            description: 'Implement MFA for all user accounts as specified in the uploaded document. This includes primary authentication via username and password, secondary authentication via SMS, email, or authenticator app, biometric authentication for supported devices, and hardware token support for high-privilege accounts.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 2,
-            label: 'Data encryption at rest and in transit using industry standards',
-            status: 'pending',
-            description: 'Ensure all data is encrypted using AES-256 encryption for data at rest, TLS 1.3 for data in transit, key management through secure key vault, and regular key rotation policies as outlined in the document.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 3,
-            label: 'Incident response procedures and escalation protocols',
-            status: 'pending',
-            description: 'Document and implement comprehensive incident response procedures including 24/7 security monitoring, automated threat detection, escalation procedures, and post-incident review processes as detailed in the uploaded PDF.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 4,
-            label: 'Access control policies and role-based permissions',
-            status: 'pending',
-            description: 'Define and implement role-based access control policies, user provisioning and deprovisioning procedures, least privilege access principles, and regular access reviews as specified in the document.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 5,
-            label: 'Audit logging requirements and monitoring systems',
-            status: 'pending',
-            description: 'Implement comprehensive audit logging for all system activities including user authentication events, data access and modification, system configuration changes, and security policy violations with proper retention policies.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 6,
-            label: 'Vulnerability management and patch management procedures',
-            status: 'pending',
-            description: 'Establish vulnerability scanning procedures, patch management processes, security testing protocols, and remediation timelines as outlined in the FedRAMP requirements document.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 7,
-            label: 'Network security controls and segmentation',
-            status: 'pending',
-            description: 'Implement network segmentation, firewall configurations, intrusion detection systems, and network monitoring as specified in the security requirements document.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 8,
-            label: 'Data backup and recovery procedures',
-            status: 'pending',
-            description: 'Establish comprehensive data backup procedures, disaster recovery plans, business continuity processes, and recovery time objectives as detailed in the uploaded document.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 9,
-            label: 'Security awareness training and personnel requirements',
-            status: 'pending',
-            description: 'Implement security awareness training programs, background check procedures, security clearance requirements, and ongoing education for personnel as specified in the document.',
-            source: 'pdf',
-            deletable: false
-          },
-          {
-            id: Date.now() + 10,
-            label: 'Third-party vendor security and risk management',
-            status: 'pending',
-            description: 'Establish vendor security assessment procedures, third-party risk management processes, contract security requirements, and ongoing vendor monitoring as outlined in the FedRAMP requirements.',
-            source: 'pdf',
-            deletable: false
-          }
-        ];
-        
-        // Add PDF-generated requirements to checklist
+            description: '',
+          source: 'pdf',
+          deletable: false,
+        }));
         setChecklistItems(prev => [...pdfRequirements, ...prev]);
+        }
         
-        // Auto-populate draft editor with content for all deliverables
-        const draftContent = `FedRAMP Security Assessment Proposal
-
-Executive Summary
-This document outlines our comprehensive approach to meeting FedRAMP security requirements for our cloud-based system. Our security framework addresses all critical areas including authentication, encryption, incident response, access control, and audit logging.
-
-1. Multi-Factor Authentication Implementation
-
-Our system implements comprehensive multi-factor authentication (MFA) for all user accounts as specified in the uploaded document. This includes:
-
-• Primary authentication via username and password
-• Secondary authentication via SMS, email, or authenticator app
-• Biometric authentication for supported devices
-• Hardware token support for high-privilege accounts
-
-2. Data Encryption at Rest and in Transit
-
-All data is encrypted using industry-standard encryption algorithms:
-
-• AES-256 encryption for data at rest
-• TLS 1.3 for data in transit
-• Key management through secure key vault
-• Regular key rotation policies
-
-3. Incident Response Procedures and Escalation Protocols
-
-Our incident response procedures include:
-
-• 24/7 security monitoring
-• Automated threat detection
-• Escalation procedures
-• Post-incident review processes
-
-4. Access Control Policies and Role-Based Permissions
-
-We implement comprehensive access control measures:
-
-• Role-based access control policies
-• User provisioning and deprovisioning procedures
-• Least privilege access principles
-• Regular access reviews
-
-5. Audit Logging Requirements and Monitoring Systems
-
-Comprehensive audit logging is implemented to track:
-
-• User authentication events
-• Data access and modification
-• System configuration changes
-• Security policy violations
-
-6. Vulnerability Management and Patch Management Procedures
-
-Our vulnerability management program includes:
-
-• Vulnerability scanning procedures
-• Patch management processes
-• Security testing protocols
-• Remediation timelines
-
-7. Network Security Controls and Segmentation
-
-Network security measures include:
-
-• Network segmentation
-• Firewall configurations
-• Intrusion detection systems
-• Network monitoring
-
-8. Data Backup and Recovery Procedures
-
-Our backup and recovery strategy includes:
-
-• Comprehensive data backup procedures
-• Disaster recovery plans
-• Business continuity processes
-• Recovery time objectives
-
-9. Security Awareness Training and Personnel Requirements
-
-Personnel security measures include:
-
-• Security awareness training programs
-• Background check procedures
-• Security clearance requirements
-• Ongoing education for personnel
-
-10. Third-Party Vendor Security and Risk Management
-
-Vendor security management includes:
-
-• Vendor security assessment procedures
-• Third-party risk management processes
-• Contract security requirements
-• Ongoing vendor monitoring
-
-Conclusion
-
-This proposal demonstrates our commitment to meeting all FedRAMP security requirements through comprehensive security controls, procedures, and monitoring systems.`;
-        
-        setDraftContent(draftContent);
+        // Update draft content with the full AI response
+        setDraftContent(result.content);
         
         // Add to changes log
         const newChange = {
           id: Date.now(),
           author: 'ai',
-          summary: `Processed uploaded document: ${files[0].name}`,
-          content: `Extracted ${pdfRequirements.length} requirements from PDF. Added to checklist and auto-populated draft editor with comprehensive content.`,
+          summary: `Processed uploaded document: ${pendingFile.name}`,
+          content: `Extracted requirements from PDF. Added to checklist and auto-populated draft editor with comprehensive content.`,
           createdAt: new Date(),
         };
         setChanges(prev => [newChange, ...prev]);
         
-        alert(`Document "${files[0].name}" uploaded successfully! ${pdfRequirements.length} requirements extracted, checklist updated, and draft editor auto-populated with content.`);
-      } catch (error) {
-        alert('Error processing document. Please try again.');
+        setPdfProcessed(pendingFile.name);
+        setToast({ message: `Processed ${pendingFile.name} for run "${currentRunName}". Draft and checklist updated.`, type: 'success' });
+        setTimeout(() => setToast(null), 5000);
+        
+        // Close modal and reset
+        setShowRunNameModal(false);
+        setPendingFile(null);
+        setCurrentRunName('');
+      } catch (error: any) {
+        console.error('PDF upload failed:', error?.message || error);
+        setToast({ message: 'Error processing PDF', type: 'error' });
+        setTimeout(() => setToast(null), 5000);
       } finally {
         setIsLoading(false);
       }
-    }
   };
 
   // Handle export
-  const handleExport = () => {
-    // Prompt user for unique filename
-    const defaultName = `FedRAMP_Proposal_${new Date().toISOString().split('T')[0]}`;
-    let fileName = prompt('Enter a unique name for your proposal:', defaultName);
-    
-    if (!fileName) return;
-    
-    // Check if name already exists
-    while (savedProposals.includes(fileName)) {
-      fileName = prompt(`"${fileName}" already exists. Please enter a different name:`, `${fileName}_${Date.now()}`);
-      if (!fileName) return;
-    }
-    
-    // Add to saved proposals
-    setSavedProposals(prev => [...prev, fileName]);
-    
-    // Create and download PDF content
-    const content = `
+  const handleExport = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Create a workspace-like structure for the backend
+      const exportData = {
+        name: `FedRAMP_Proposal_${new Date().toISOString().split('T')[0]}`,
+        draftContent,
+        checklistItems,
+        llmChanges
+      };
+      
+      // Try to export via backend API
+      const candidates = [
+        `${window.location.protocol}//${window.location.hostname}:3000`,
+        `${window.location.origin}`,
+        `http://localhost:3000`,
+        `http://127.0.0.1:3000`,
+      ];
+      
+      let exportSuccess = false;
+      for (const baseUrl of candidates) {
+        try {
+          // First, create a "run" via upload endpoint
+          const formData = new FormData();
+          formData.append('name', exportData.name);
+          
+          // Create a dummy file with our content
+          const contentBlob = new Blob([draftContent], { type: 'text/plain' });
+          formData.append('file', contentBlob, 'draft.txt');
+          
+          const uploadResponse = await fetch(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (uploadResponse.ok) {
+            const uploadHtml = await uploadResponse.text();
+            // Extract run ID from response
+            const runIdMatch = uploadHtml.match(/run\/(\d+)/);
+            if (runIdMatch) {
+              const runId = runIdMatch[1];
+              
+              // Now try to export as PDF
+              const exportResponse = await fetch(`${baseUrl}/run/${runId}/export`, {
+                method: 'POST'
+              });
+              
+              if (exportResponse.ok) {
+                const exportHtml = await exportResponse.text();
+                // Extract download link from response
+                const downloadMatch = exportHtml.match(/href='([^']*\.pdf)'/);
+                if (downloadMatch) {
+                  const downloadPath = downloadMatch[1];
+                  // Trigger download
+                  window.open(`${baseUrl}${downloadPath}`, '_blank');
+                  setToast({ message: 'PDF exported successfully!', type: 'success' });
+                  setTimeout(() => setToast(null), 5000);
+                  exportSuccess = true;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.log(`Failed to export via ${baseUrl}:`, error);
+          continue;
+        }
+      }
+      
+      if (!exportSuccess) {
+        // Fallback to text export
+        const defaultName = `FedRAMP_Proposal_${new Date().toISOString().split('T')[0]}`;
+        let fileName = prompt('PDF export unavailable. Enter a name for text export:', defaultName);
+        
+        if (!fileName) return;
+        
+        // Check if name already exists
+        while (savedProposals.includes(fileName)) {
+          fileName = prompt(`"${fileName}" already exists. Please enter a different name:`, `${fileName}_${Date.now()}`);
+          if (!fileName) return;
+        }
+        
+        // Add to saved proposals
+        setSavedProposals(prev => [...prev, fileName]);
+        
+        // Create and download text content
+        const content = `
 FedRAMP Security Assessment Proposal
 Generated: ${new Date().toLocaleDateString()}
 Filename: ${fileName}
@@ -389,20 +323,30 @@ ${checklistItems.map(item => `- ${item.label}: ${item.status}`).join('\n')}
 
 LLM CHANGES:
 ${llmChanges.map(change => `- ${change.type}: ${change.content.substring(0, 100)}...`).join('\n')}
-    `;
-    
-    // Create blob and download
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${fileName}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    alert(`Proposal saved as "${fileName}.txt"`);
+        `;
+        
+        // Create blob and download
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fileName}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setToast({ message: `Text export saved as ${fileName}.txt (PDF export unavailable)`, type: 'success' });
+        setTimeout(() => setToast(null), 5000);
+      }
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      setToast({ message: 'Export failed. Please try again.', type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Add new checklist item
@@ -463,15 +407,49 @@ ${llmChanges.map(change => `- ${change.type}: ${change.content.substring(0, 100)
     setTimeout(() => scrollChatToBottom(), 50);
 
     try {
-      // Enhanced prompt for better AI responses
-      const enhancedPrompt = `You are a FedRAMP compliance expert helping write a security proposal. The user asked: "${currentMessage}". 
+      const userRequestedEdit = /\b(add|insert|apply|update|modify|put this in|add to draft)\b/i.test(currentMessage);
 
-Current draft content: "${draftContent.substring(0, 500)}..."
-Current checklist items: ${checklistItems.map(item => item.label).join(', ')}
+      const enhancedPrompt = `You are a single, conversational FedRAMP assistant. Speak naturally and contextually like a helpful expert.
+User message: "${currentMessage}".
 
-Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposal. Be detailed and professional. After your suggestions, ask: "Would you like me to add any of these suggestions to your draft?"`;
+Current draft excerpt: "${draftContent.substring(0, 500)}..."
+Checklist items: ${checklistItems.map(item => item.label).join(', ')}
 
-      const aiResponse = await callOpenAI(enhancedPrompt);
+Respond with a short friendly sentence first, then a clear, structured answer tailored to the question (bulleted or numbered when helpful). Be specific and professional, avoid generic filler, and do not repeat earlier advice verbatim. Do not ask to add content to the draft unless the user explicitly requested an edit.`;
+
+      // Call the backend chat API
+      const response = await fetch('http://localhost:3000/api/chat/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: currentMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Chat API failed');
+      }
+
+      const result = await response.json();
+      const aiResponse = result.data.content;
+      
+      // Handle LLM suggestions if provided
+      if (result.data.suggestions && result.data.suggestions.length > 0) {
+        setLlmChanges(prev => [...prev, ...result.data.suggestions]);
+        
+        // If it's a draft addition, add it to the draft content
+        result.data.suggestions.forEach((suggestion: any) => {
+          if (suggestion.type === 'draft_addition') {
+            if (suggestion.position === -1) {
+              // Add to bottom
+              setDraftContent(prev => prev + '\n\n' + suggestion.content);
+            } else {
+              // Add at specific position (for future use)
+              setDraftContent(prev => prev + '\n' + suggestion.content);
+            }
+          }
+        });
+      }
       
       const aiMessage = {
         id: Date.now() + 1,
@@ -485,13 +463,15 @@ Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposa
       // Scroll to bottom after AI response
       setTimeout(() => scrollChatToBottom(), 50);
 
-      // Check if AI is asking for confirmation to add suggestions
-      if (aiResponse.includes('Would you like me to add any of these suggestions')) {
+      if (userRequestedEdit) {
         setShowSuggestionConfirmation(true);
-        // Extract suggestions from response
-        const suggestions = aiResponse.split('\n').filter(line => 
-          line.trim().startsWith('-') || line.trim().startsWith('•') || line.trim().startsWith('1.') || line.trim().startsWith('2.') || line.trim().startsWith('3.') || line.trim().startsWith('4.')
-        );
+        const suggestions = aiResponse
+          .split('\n')
+          .filter(line => line.trim().startsWith('-') || line.trim().startsWith('•') || /^(\d+\.|\*)\s/.test(line.trim()))
+          .map(line => {
+            const text = line.replace(/^[-•*]\s*/, '').replace(/^(\d+)\.[\s]*/, '');
+            return text.replace(/\*\*/g, '').replace(/\*/g, '');
+          });
         setPendingSuggestions(suggestions);
       }
     } catch (error) {
@@ -501,48 +481,69 @@ Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposa
 
   const handleAddSuggestions = () => {
     if (pendingSuggestions.length > 0) {
-      const newContent = '\n\n' + pendingSuggestions.join('\n');
-      setDraftContent(prev => prev + newContent);
-      
-      // Track LLM change
-      const change = {
-        id: Date.now(),
-        type: 'content_addition',
-        content: newContent,
-        timestamp: new Date().toLocaleTimeString(),
-        position: draftContent.length
-      };
-      setLlmChanges(prev => [...prev, change]);
-      
-      // Add to changes log
-      setChanges(prev => [...prev, {
-        id: Date.now(),
-        author: 'ai',
-        summary: 'AI Content Added to Draft',
-        content: 'AI suggestions added to draft editor',
-        createdAt: new Date()
-      }]);
+      const cleanLines = pendingSuggestions.map(l => l.replace(/\*\*/g, '').replace(/\*/g, ''));
+      const fullContent = '\n\n' + cleanLines.join('\n');
 
-      // Add confirmation message
-      const confirmMessage = { 
-        id: Date.now() + 1, 
-        text: "✅ Suggestions added to your draft! The content has been automatically inserted into the Draft Editor tab. You can see the changes in the LLM Changes panel on the right.", 
-        author: 'ai',
-        timestamp: new Date()
+      const changeId = Date.now();
+      const initialPosition = draftContent.length;
+      const initialChange: any = {
+        id: changeId,
+        type: 'llm_added_suggestion',
+        content: '',
+        timestamp: new Date(),
+        position: initialPosition
       };
-      setChatHistory(prev => [...prev, confirmMessage]);
-      
-      // Auto-scroll to draft editor tab to show the changes
+      setLlmChanges(prev => [...prev, initialChange]);
+
+      const CHUNK_SIZE = 40;
+      let cursor = 0;
+      const streamInterval = setInterval(() => {
+        const nextChunk = fullContent.slice(cursor, cursor + CHUNK_SIZE);
+        if (!nextChunk) {
+          clearInterval(streamInterval);
+          setChanges(prev => [...prev, {
+            id: Date.now(),
+            author: 'ai',
+            summary: 'AI Content Added to Draft',
+            content: 'AI suggestions added to draft editor',
+            createdAt: new Date()
+          }]);
+          const confirmMessage = { 
+            id: Date.now() + 1, 
+            text: '✅ Suggestions added to your draft and tracked on the right as LLM-added suggestions.', 
+            author: 'ai',
+            timestamp: new Date()
+          };
+          setChatHistory(prev => [...prev, confirmMessage]);
+          setShowSuggestionConfirmation(false);
+          setPendingSuggestions([]);
+          return;
+        }
+        cursor += CHUNK_SIZE;
+        setDraftContent(prev => prev + nextChunk);
+        setLlmChanges(prev => prev.map(c => c.id === changeId ? { ...c, content: (c.content || '') + nextChunk } : c));
+      }, 30);
+
       setActiveTab('editor');
-      
-      setShowSuggestionConfirmation(false);
-      setPendingSuggestions([]);
     }
   };
 
   return (
     <>
     <div className="h-screen bg-gray-50 flex flex-col relative">
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-[60] px-6 py-4 rounded-lg border-2 shadow-xl font-semibold ${
+            toast.type === 'success'
+              ? 'bg-green-600 text-white border-green-700'
+              : 'bg-red-600 text-white border-red-700'
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          {toast.message}
+        </div>
+      )}
       {/* Header */}
       <div className="border-b border-gray-200 bg-white flex-shrink-0">
         <div className="px-6 py-4">
@@ -565,9 +566,9 @@ Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposa
                 <Upload className="h-4 w-4 mr-2" />
                 Upload PDF
               </Button>
-              <Button variant="primary" size="sm" onClick={handleExport} disabled={completionRate < 100}>
+              <Button variant="primary" size="sm" onClick={handleExport} disabled={isLoading || completionRate < 100}>
                 <Download className="h-4 w-4 mr-2" />
-                Export PDF
+                {isLoading ? 'Exporting...' : 'Export PDF'}
               </Button>
             </div>
           </div>
@@ -603,7 +604,7 @@ Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposa
                   <div key={item.id} className="border-b border-gray-200 pb-3 mb-3">
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-bold text-gray-900 text-sm leading-tight flex-1">
-                        {item.label}
+                        {item.title || item.label}
                       </h3>
                       {item.deletable && (
                         <button
@@ -615,7 +616,7 @@ Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposa
                       )}
                     </div>
                     <div className="text-xs text-gray-600 leading-relaxed mb-2">
-                      {item.description}
+                      {item.summary || item.description}
                     </div>
                     <div className="flex items-center justify-between">
                       <select
@@ -732,6 +733,10 @@ Provide 3-4 specific, actionable suggestions for improving their FedRAMP proposa
                       <Button variant="secondary" size="sm" onClick={saveDraft}>
                         <Save className="h-4 w-4 mr-2" />
                         Save Draft
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setShowRunNameModal(true)}>
+                        <History className="h-4 w-4 mr-2" />
+                        Archive
                       </Button>
                       <Button variant="outline" size="sm">
                         <Eye className="h-4 w-4 mr-2" />
@@ -852,9 +857,9 @@ Use the checklist on the left to ensure you cover all requirements."
                         <span className="text-xs font-medium text-blue-600">AI</span>
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-gray-900 mb-1">Added content</p>
+                        <p className="text-sm text-gray-900 mb-1">LLM-added suggestion</p>
                         <p className="text-xs text-gray-600 mb-2">
-                          {change.timestamp.toLocaleTimeString()}
+                          {(change.timestamp instanceof Date ? change.timestamp : new Date(change.timestamp)).toLocaleTimeString()}
                         </p>
                         <button
                           onClick={() => {
@@ -869,6 +874,18 @@ Use the checklist on the left to ensure you cover all requirements."
                         >
                           Highlight in draft
                         </button>
+                        <div
+                          onClick={() => {
+                            const textarea = document.querySelector('textarea');
+                            if (textarea) {
+                              textarea.focus();
+                              textarea.setSelectionRange(change.position, change.position + change.content.length);
+                            }
+                          }}
+                          className="mt-2 cursor-pointer text-xs text-blue-600"
+                        >
+                          Jump to section
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -1015,6 +1032,45 @@ Use the checklist on the left to ensure you cover all requirements."
         </div>
       </div>
     </div>
+
+    {/* Run Name Modal */}
+    {showRunNameModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-96">
+          <h3 className="text-lg font-semibold mb-4">Name Your Run</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Give this PDF processing run a name to organize your work.
+          </p>
+          <input
+            type="text"
+            value={currentRunName}
+            onChange={(e) => setCurrentRunName(e.target.value)}
+            placeholder="e.g., FedRAMP Initial Assessment"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md mb-4"
+            autoFocus
+          />
+          <div className="flex justify-end space-x-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowRunNameModal(false);
+                setPendingFile(null);
+                setCurrentRunName('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleRunNameSubmit}
+              disabled={!currentRunName.trim() || isLoading}
+            >
+              {isLoading ? 'Processing...' : 'Start Run'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

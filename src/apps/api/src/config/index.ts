@@ -2,73 +2,24 @@
  * @fileoverview Application configuration
  */
 
-import { config as dotenvConfig } from 'dotenv';
-import { z } from 'zod';
-
-// Load environment variables
-dotenvConfig();
-
-const configSchema = z.object({
-  // Server configuration
-  server: z.object({
-    host: z.string().default('localhost'),
-    port: z.number().default(3001),
-    scheme: z.enum(['http', 'https']).default('http'),
-  }),
-
-  // Database configuration
-  database: z.object({
-    url: z.string().url(),
-  }),
-
-  // Authentication
-  auth: z.object({
-    jwtSecret: z.string().min(32),
-    jwtExpiresIn: z.string().default('7d'),
-  }),
-
-  // CORS configuration
-  cors: z.object({
-    origins: z.array(z.string()).default(['http://localhost:3000']),
-  }),
-
-  // File upload configuration
-  upload: z.object({
-    maxFileSize: z.number().default(50 * 1024 * 1024), // 50MB
-    maxFiles: z.number().default(10),
-    allowedMimeTypes: z.array(z.string()).default([
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-    ]),
-  }),
-
-  // AI/LLM configuration
-  ai: z.object({
-    provider: z.enum(['openai', 'azure', 'custom']).default('openai'),
-    apiKey: z.string().optional(),
-    baseUrl: z.string().url().optional(),
-    model: z.string().default('gpt-4'),
-    temperature: z.number().min(0).max(2).default(0.3),
-    maxTokens: z.number().positive().default(1200),
-  }),
-
-  // Azure configuration
-  azure: z.object({
-    storageAccountName: z.string().optional(),
-    storageAccountKey: z.string().optional(),
-    storageContainerName: z.string().default('microtech-documents'),
-    keyVaultUrl: z.string().url().optional(),
-    cosmosDbUrl: z.string().url().optional(),
-    cosmosDbKey: z.string().optional(),
-  }),
-
-  // Logging configuration
-  logging: z.object({
-    level: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-    pretty: z.boolean().default(process.env.NODE_ENV !== 'production'),
-  }),
-});
+// Load environment variables from .env automatically (project root and API dir)
+try {
+  const path = require('path');
+  const fs = require('fs');
+  const dotenv = require('dotenv');
+  const candidatePaths = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(__dirname, '../../../../.env'), // project root when running from dist
+    path.resolve(__dirname, '../../../.env'),    // fallback relative
+    path.resolve(__dirname, '../../.env'),
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      dotenv.config({ path: p });
+      break;
+    }
+  }
+} catch {}
 
 const rawConfig = {
   server: {
@@ -84,7 +35,7 @@ const rawConfig = {
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   cors: {
-    origins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
   },
   upload: {
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '52428800', 10), // 50MB
@@ -97,7 +48,7 @@ const rawConfig = {
   },
   ai: {
     provider: process.env.AI_PROVIDER || 'openai',
-    apiKey: process.env.OPENAI_API_KEY || process.env.AI_API_KEY,
+    apiKey: process.env.OPENAI_KEY,
     baseUrl: process.env.AI_BASE_URL,
     model: process.env.AI_MODEL || 'gpt-4',
     temperature: parseFloat(process.env.AI_TEMPERATURE || '0.3'),
@@ -117,7 +68,17 @@ const rawConfig = {
   },
 };
 
-export const config = configSchema.parse(rawConfig);
+// Minimal runtime validation without zod
+export const config = {
+  server: rawConfig.server,
+  database: rawConfig.database,
+  auth: rawConfig.auth,
+  cors: rawConfig.cors,
+  upload: rawConfig.upload,
+  ai: rawConfig.ai,
+  azure: rawConfig.azure,
+  logging: rawConfig.logging,
+};
 
 // Validate required environment variables
 if (!config.ai.apiKey && config.ai.provider !== 'custom') {

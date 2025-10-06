@@ -2,11 +2,23 @@
   "name": "microtech-api",
   "version": "1.0.0",
   "scripts": {
+    "build": "tsc",
     "dev": "node server.js",
     "start": "node server.js"
   },
   "dependencies": {
     "fastify": "^4.24.3",
-    "@fastify/cors": "^8.4.0"
+    "@fastify/cors": "^8.4.0",
+    "@fastify/multipart": "^8.3.0",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/static": "^6.12.0",
+    "@fastify/swagger": "^8.15.0",
+    "@fastify/swagger-ui": "^2.1.0",
+    "@microtech/ai": "1.0.0",
+    "@microtech/core": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
   }
 }

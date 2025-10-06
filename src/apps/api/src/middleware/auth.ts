@@ -27,6 +27,10 @@ export async function authMiddleware(fastify: FastifyInstance) {
       '/api/docs',
       '/api/docs/static',
       '/api/docs/json',
+      // Allow chat endpoints publicly so the frontend can call LLM without auth in this workspace
+      '/api/chat/send',
+      // Allow uploads to be analyzed by the LLM without auth in this workspace
+      '/api/upload/pdf',
     ];
 
     if (publicRoutes.some(route => request.url.startsWith(route))) {
