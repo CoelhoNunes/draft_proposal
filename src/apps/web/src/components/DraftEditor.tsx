@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bold, Eye, Italic, List, Save, Sparkles } from 'lucide-react';
 import { useDraftStore, DraftSection } from '@/store/draftStore';
 import { saveDraftToArchive } from '@/api/drafts';
@@ -27,35 +27,50 @@ const SectionCard = ({
   onHeadingChange,
   onContentChange,
   onSelection,
-  highlighted,
+  highlightRange,
 }: {
   section: DraftSection;
   onHeadingChange: (sectionId: string, heading: string) => void;
   onContentChange: (sectionId: string, content: string) => void;
   onSelection: (sectionId: string, cursor: number | null) => void;
-  highlighted: boolean;
+  highlightRange: { start: number; end: number } | null;
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    if (!highlighted || !textareaRef.current) {
+    if (!textareaRef.current) {
       return;
     }
     const el = textareaRef.current;
-    el.dataset.highlight = 'true';
-    el.classList.add('ring-2', 'ring-blue-400', 'bg-blue-50');
-    const clear = () => {
+    if (!highlightRange) {
+      el.dataset.highlightActive = 'false';
+      return;
+    }
+
+    const clampedStart = Math.max(0, Math.min(highlightRange.start, el.value.length));
+    const clampedEnd = Math.max(clampedStart, Math.min(highlightRange.end, el.value.length));
+
+    el.dataset.highlightActive = 'true';
+    const previousScroll = el.scrollTop;
+    el.focus({ preventScroll: true });
+    el.setSelectionRange(clampedStart, clampedEnd);
+    el.scrollTop = previousScroll;
+
+    const timer = window.setTimeout(() => {
+      if (!textareaRef.current) {
+        return;
+      }
+      textareaRef.current.dataset.highlightActive = 'false';
+      textareaRef.current.setSelectionRange(clampedEnd, clampedEnd);
+    }, 2400);
+
+    return () => {
+      window.clearTimeout(timer);
       if (textareaRef.current) {
-        delete textareaRef.current.dataset.highlight;
-        textareaRef.current.classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50');
+        textareaRef.current.dataset.highlightActive = 'false';
       }
     };
-    const timer = setTimeout(clear, 2000);
-    return () => {
-      clearTimeout(timer);
-      clear();
-    };
-  }, [highlighted]);
+  }, [highlightRange]);
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -93,6 +108,7 @@ export function DraftEditor({ projectId }: DraftEditorProps) {
     toast,
     clearToast,
     llmChanges,
+    activeHighlight,
     run,
   } = useDraftStore();
 
@@ -179,6 +195,21 @@ export function DraftEditor({ projectId }: DraftEditorProps) {
     return change?.sectionId ?? null;
   }, [activeHighlightId, llmChanges]);
 
+  const highlightRanges = useMemo(() => {
+    if (!activeHighlight) {
+      return {} as Record<string, { start: number; end: number }>;
+    }
+    if (!activeHighlight.sectionId) {
+      return {} as Record<string, { start: number; end: number }>;
+    }
+    return {
+      [activeHighlight.sectionId]: {
+        start: activeHighlight.start,
+        end: activeHighlight.end,
+      },
+    };
+  }, [activeHighlight]);
+
   return (
     <div className="flex h-full flex-col">
       {toast && (
@@ -257,7 +288,11 @@ export function DraftEditor({ projectId }: DraftEditorProps) {
                 onHeadingChange={handleHeadingChange}
                 onContentChange={handleContentChange}
                 onSelection={handleSelection}
-                highlighted={highlightedSectionId === section.id}
+                highlightRange={
+                  highlightedSectionId === section.id
+                    ? highlightRanges[section.id] ?? null
+                    : null
+                }
               />
             ))}
           </div>

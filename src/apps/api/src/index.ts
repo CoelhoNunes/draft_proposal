@@ -36,6 +36,7 @@ import { chatRoutes } from './routes/chat.js';
 import { exportRoutes } from './routes/exports.js';
 import { uploadRoutes } from './routes/upload.js';
 import { draftRoutes } from './routes/drafts.js';
+import { runsRoutes } from './routes/runs.js';
 import { ragDebugRoutes } from './routes/ragDebug.js';
 import { healthRoutes } from './routes/health.js';
 import { telemetryRoutes } from './routes/telemetry.js';
@@ -145,6 +146,7 @@ export async function createServer() {
   await fastify.register(chatRoutes, { prefix: '/api/chat' });
   await fastify.register(exportRoutes, { prefix: '/api/exports' });
   await fastify.register(uploadRoutes, { prefix: '/api/upload' });
+  await fastify.register(runsRoutes, { prefix: '/api' });
   await fastify.register(telemetryRoutes, { prefix: '/api/telemetry' });
   if (config.features.archiveV2) {
     await fastify.register(draftRoutes, { prefix: '/api' });

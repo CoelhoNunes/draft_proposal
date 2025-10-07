@@ -269,3 +269,12 @@ textarea {
 .bg-black\\/20 {
   background-color: rgba(0, 0, 0, 0.2);
 }
+textarea[data-highlight-active='true'] {
+  background-color: #fffbeb;
+  transition: background-color 0.25s ease;
+}
+
+textarea[data-highlight-active='true']::selection {
+  background-color: #fef08a;
+  color: inherit;
+}
