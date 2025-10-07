@@ -590,3 +590,39 @@ Import our Postman collection for easy API testing:
 - **Response Time**: 4 hours for critical issues
 - **Uptime SLA**: 99.9%
 - **Support Hours**: Monday - Friday, 9 AM - 6 PM EST
+
+### Proposal Draft & Archive Endpoints
+
+#### POST /api/drafts
+Create a new draft run. File names must be unique per project when the `FF_ARCHIVE_UNIQUE_NAMES` flag is enabled.
+
+**Request:**
+```json
+{
+  "projectId": "11111111-1111-1111-1111-111111111111",
+  "fileName": "proposal-draft.md",
+  "title": "Initial Draft",
+  "status": "draft",
+  "sections": [
+    { "heading": "Executive Summary", "body": "Overview" }
+  ],
+  "deliverables": [
+    { "title": "Plan of Actions" }
+  ]
+}
+```
+
+#### PATCH /api/drafts/:id
+Update an existing draft. Changing `fileName` respects the uniqueness rules when the feature flag is active.
+
+#### GET /api/drafts/:id
+Retrieve a draft run by identifier.
+
+#### GET /api/projects/:projectId/drafts
+List drafts for a project. Supports `search`, `status`, `page`, and `limit` query parameters.
+
+#### POST /api/archive
+Persist the current draft into the archive and draft store. Returns `409` with a suggested file name when a duplicate is detected (under feature flag control).
+
+#### GET /api/archive/:id
+Retrieve an archived draft. Returns `404` if the entry is not found.

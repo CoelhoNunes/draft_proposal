@@ -2,7 +2,7 @@
  * @fileoverview Core domain types and interfaces for the MicroTech platform
  */
 
-import { z } from '../z';
+import { z } from '../z/index.js';
 
 type InferSchema<T extends { parse: (value: unknown) => unknown }> = T extends {
   parse: (value: unknown) => infer U;

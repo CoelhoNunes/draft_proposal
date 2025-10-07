@@ -5,8 +5,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from '@microtech/core';
 import { ChatService, ChatConfig } from '@microtech/ai';
-import { config } from '../config';
-import { logger } from '../utils/logger';
+import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
 
 const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
@@ -43,7 +43,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
   const chatService = new ChatService(chatConfig);
 
   if (provider === 'mock') {
-    logger.warn('AI chat service running in mock mode - configure OPENAI_KEY for production-grade responses');
+    logger.warn('AI chat service running in mock mode - configure OPENAI_API_KEY for production-grade responses');
   }
 
   // Send chat message

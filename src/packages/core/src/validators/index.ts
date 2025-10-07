@@ -2,14 +2,14 @@
  * @fileoverview Shared validation utilities and schemas
  */
 
-import { z } from '../z';
+import { z } from '../z/index.js';
 import {
   UserSchema,
   WorkspaceSchema,
   DocumentSchema,
   ChecklistItemSchema,
   ChangeSchema
-} from '../types';
+} from '../types/index.js';
 
 type SafeParseResult<T> =
   | { success: true; data: T }

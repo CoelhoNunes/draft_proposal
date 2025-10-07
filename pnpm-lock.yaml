@@ -57,10 +57,10 @@ importers:
         specifier: ^2.1.0
         version: 2.1.0
       '@microtech/ai':
-        specifier: 1.0.0
+        specifier: workspace:*
         version: link:../../packages/ai
       '@microtech/core':
-        specifier: 1.0.0
+        specifier: workspace:*
         version: link:../../packages/core
       dotenv:
         specifier: ^17.2.3
@@ -149,7 +149,7 @@ importers:
   src/packages/ai:
     dependencies:
       '@microtech/core':
-        specifier: 1.0.0
+        specifier: workspace:*
         version: link:../core
       axios:
         specifier: ^1.6.0

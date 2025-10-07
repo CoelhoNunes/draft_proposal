@@ -3,8 +3,8 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { config } from '../config';
-import { logger } from '../utils/logger';
+import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
 
 export async function healthRoutes(fastify: FastifyInstance) {
   // Basic health check

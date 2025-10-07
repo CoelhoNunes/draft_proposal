@@ -53,6 +53,23 @@ echo "📦 Installing project dependencies..."
 pnpm install
 
 # =============================================================================
+# Ensure local Python virtual environment
+# =============================================================================
+echo ""
+echo "🐍 Preparing local Python virtual environment (.venv)..."
+if command -v python3 &> /dev/null; then
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+        echo "✅ Created .venv virtual environment"
+    else
+        echo "✅ .venv already exists"
+    fi
+    ./.venv/bin/python -m pip install --upgrade pip >/dev/null 2>&1 || true
+else
+    echo "⚠️  Python 3 not found. Install Python 3 to work with ingestion scripts."
+fi
+
+# =============================================================================
 # Build packages
 # =============================================================================
 echo ""

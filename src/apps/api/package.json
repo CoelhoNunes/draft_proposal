@@ -1,11 +1,14 @@
 {
   "name": "microtech-api",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "prebuild": "tsc -b --clean",
+    "build": "tsc -b",
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "pnpm run build && node --test \"./tests/**/*.test.mjs\""
+    "pretest": "pnpm -w -r build",
+    "test": "node --test \"./tests/**/*.test.mjs\""
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",
@@ -14,8 +17,8 @@
     "@fastify/static": "^6.12.0",
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^2.1.0",
-    "@microtech/ai": "1.0.0",
-    "@microtech/core": "1.0.0",
+    "@microtech/ai": "workspace:*",
+    "@microtech/core": "workspace:*",
     "dotenv": "^17.2.3",
     "fastify": "^4.24.3",
     "openai": "^4.56.0"

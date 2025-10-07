@@ -1,5 +1,7 @@
 packages:
   - 'src/apps/*'
-  - 'src/packages/core'
-  - 'src/packages/ai'
-  - 'src/packages/ui'
+  - 'src/packages/*'
+  - 'apps/*'
+  - 'packages/*'
+  - 'services/*'
+  - 'libs/*'
