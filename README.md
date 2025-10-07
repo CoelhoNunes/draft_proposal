@@ -158,6 +158,10 @@ microtech-platform/
 - **Storage**: Azure Blob Storage for file uploads
 - **Secrets**: Azure Key Vault for secure configuration
 - **Monitoring**: Azure Application Insights
+
+## 📄 Proposal page 1-2-3 layout & LLM workflow
+
+The proposal workspace now uses a dedicated three-column layout aligned with the “deliverables → draft → assistant” workflow. Deliverables and checklist completion control export availability, the central draft editor supports section-level highlighting for approved AI changes, and the right column consolidates the change log with a gated assistant chat. All AI content is only added to the draft after explicit confirmation, and API helpers wrap the new `/api/runs` family of endpoints for run management, change commits, and export requests.
 - **IaC**: Bicep templates for infrastructure provisioning
 
 ## 🎯 Key Features

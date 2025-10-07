@@ -1,57 +1,100 @@
 import { create } from 'zustand';
 
-interface DraftToast {
+type DeliverableStatus = 'todo' | 'in_progress' | 'done';
+
+type DraftToast = {
   id: string;
   message: string;
   tone: 'success' | 'error';
-}
+};
 
-interface DraftSection {
+type HighlightAnchor = { startOffset: number; endOffset: number } | null;
+
+type DraftChecklistItem = {
+  id: string;
+  text: string;
+  done: boolean;
+};
+
+type DraftDeliverable = {
+  id: string;
+  runId?: string;
+  title: string;
+  description: string;
+  status: DeliverableStatus;
+  checklistItems: DraftChecklistItem[];
+};
+
+type DraftSection = {
   id: string;
   heading: string;
-  body: string;
-  deliverableIds: string[];
-}
-
-interface DraftDeliverable {
-  id: string;
-  title: string;
-  description?: string;
-  sectionHint?: string;
-}
-
-interface DraftLlmChange {
-  id: string;
-  summary: string;
   content: string;
+  order: number;
+};
+
+type DraftLlmChange = {
+  id: string;
+  runId?: string;
+  sectionId: string | null;
+  summary: string;
+  insertedText: string;
   createdAt: string;
+  approvedByUser: boolean;
+  highlightAnchor: HighlightAnchor;
   highlight: boolean;
   sourceMessageId?: string;
-}
+};
 
-interface DraftState {
-  content: string;
+type DraftRunMeta = {
+  id: string;
+  projectId: string;
+  runName: string;
+  createdAt: string;
+  updatedAt: string;
+  pdfMeta: { fileId: string; filename: string; pages: number } | null;
+  status: 'draft' | 'final';
+  chatThreadId: string | null;
+};
+
+type DraftState = {
+  run: DraftRunMeta | null;
   sections: DraftSection[];
   deliverables: DraftDeliverable[];
   llmChanges: DraftLlmChange[];
+  draftContent: string;
   lastCursor: number | null;
+  focusedSectionId: string | null;
   toast: DraftToast | null;
-}
+  exportReady: boolean;
+};
 
-interface DraftActions {
-  setContent: (content: string) => void;
-  setCursor: (cursor: number | null) => void;
-  addDeliverables: (items: DraftDeliverable[]) => void;
-  setDeliverables: (items: DraftDeliverable[]) => void;
+type DraftActions = {
+  initialiseRun: (meta: DraftRunMeta, sections: DraftSection[], deliverables: DraftDeliverable[]) => void;
   setSections: (sections: DraftSection[]) => void;
+  updateSectionContent: (sectionId: string, content: string) => void;
+  setDeliverables: (deliverables: DraftDeliverable[]) => void;
+  upsertDeliverable: (deliverable: DraftDeliverable) => void;
+  updateDeliverableStatus: (deliverableId: string, status: DeliverableStatus) => void;
+  toggleChecklistItem: (deliverableId: string, itemId: string, done: boolean) => void;
+  setContent: (content: string) => void;
+  setCursor: (payload: { sectionId: string | null; cursor: number | null }) => void;
+  addLlmChange: (payload: Omit<DraftLlmChange, 'highlight'> & { highlight?: boolean }) => void;
   clearHighlight: () => void;
-  addToDraft: (payload: { text: string; summary: string; sourceMessageId?: string }) => void;
+  highlightChange: (changeId: string) => void;
+  addToDraft: (payload: {
+    sectionId?: string | null;
+    text: string;
+    summary: string;
+    runId?: string;
+    highlightAnchor?: HighlightAnchor;
+    sourceMessageId?: string;
+  }) => void;
   registerError: (message: string) => void;
   clearToast: () => void;
   parseChecklist: (rawChecklist: string) => DraftDeliverable[];
   mapDeliverablesToSections: (items: DraftDeliverable[]) => DraftSection[];
   composeProposalFromChecklist: (items: DraftDeliverable[]) => string;
-}
+};
 
 const createId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -71,60 +114,178 @@ const trackCounter = (name: string) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   }).catch(() => {
-    // Swallow network errors – telemetry is best effort only.
+    // Telemetry is best effort.
   });
 };
 
+const joinSections = (sections: DraftSection[]) =>
+  sections
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((section) => {
+      const heading = section.heading ? `## ${section.heading}` : '';
+      return [heading, section.content.trim()].filter(Boolean).join('\n');
+    })
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+
+const computeExportReady = (deliverables: DraftDeliverable[]) =>
+  deliverables.length > 0 &&
+  deliverables.every((deliverable) =>
+    deliverable.status === 'done' && deliverable.checklistItems.every((item) => item.done),
+  );
+
 export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
-  content: '',
+  run: null,
   sections: [],
   deliverables: [],
   llmChanges: [],
+  draftContent: '',
   lastCursor: null,
+  focusedSectionId: null,
   toast: null,
+  exportReady: false,
 
-  setContent(content) {
-    set({ content });
-  },
+  initialiseRun(meta, sections, deliverables) {
+    const normalisedSections = sections
+      .map((section, index) => ({
+        ...section,
+        id: section.id || createId(),
+        heading: sanitize(section.heading),
+        content: section.content?.trim() || '',
+        order: typeof section.order === 'number' ? section.order : index,
+      }))
+      .sort((a, b) => a.order - b.order);
 
-  setCursor(cursor) {
-    set({ lastCursor: cursor });
-  },
-
-  addDeliverables(items) {
-    const cleaned = items
-      .map((item) => ({
+    const formattedDeliverables = deliverables.map((deliverable) => ({
+      ...deliverable,
+      id: deliverable.id || createId(),
+      title: sanitize(deliverable.title),
+      description: deliverable.description?.trim() || '',
+      status: deliverable.status || 'todo',
+      checklistItems: (deliverable.checklistItems || []).map((item) => ({
         ...item,
         id: item.id || createId(),
-        title: sanitize(item.title),
-        description: item.description?.trim(),
-        sectionHint: item.sectionHint?.trim(),
-      }))
-      .filter((item) => item.title.length > 0);
-
-    set((state) => ({ deliverables: [...state.deliverables, ...cleaned] }));
-  },
-
-  setDeliverables(items) {
-    const formatted = items.map((item) => ({
-      ...item,
-      id: item.id || createId(),
-      title: sanitize(item.title),
-      description: item.description?.trim(),
-      sectionHint: item.sectionHint?.trim(),
+        text: sanitize(item.text),
+        done: Boolean(item.done),
+      })),
     }));
-    set({ deliverables: formatted });
+
+    set({
+      run: meta,
+      sections: normalisedSections,
+      deliverables: formattedDeliverables,
+      draftContent: joinSections(normalisedSections),
+      exportReady: computeExportReady(formattedDeliverables),
+    });
   },
 
   setSections(sections) {
-    const normalised = sections.map((section) => ({
-      ...section,
-      id: section.id || createId(),
-      heading: sanitize(section.heading),
-      body: section.body.trim(),
-      deliverableIds: section.deliverableIds ?? [],
+    const normalised = sections
+      .map((section, index) => ({
+        ...section,
+        id: section.id || createId(),
+        heading: sanitize(section.heading),
+        content: section.content?.trim() || '',
+        order: typeof section.order === 'number' ? section.order : index,
+      }))
+      .sort((a, b) => a.order - b.order);
+
+    set({ sections: normalised, draftContent: joinSections(normalised) });
+  },
+
+  updateSectionContent(sectionId, content) {
+    set((state) => {
+      const nextSections = state.sections.map((section) =>
+        section.id === sectionId ? { ...section, content } : section,
+      );
+      return {
+        sections: nextSections,
+        draftContent: joinSections(nextSections),
+      };
+    });
+  },
+
+  setDeliverables(deliverables) {
+    const formatted = deliverables.map((deliverable) => ({
+      ...deliverable,
+      id: deliverable.id || createId(),
+      title: sanitize(deliverable.title),
+      description: deliverable.description?.trim() || '',
+      status: deliverable.status || 'todo',
+      checklistItems: (deliverable.checklistItems || []).map((item) => ({
+        ...item,
+        id: item.id || createId(),
+        text: sanitize(item.text),
+        done: Boolean(item.done),
+      })),
     }));
-    set({ sections: normalised });
+
+    set({ deliverables: formatted, exportReady: computeExportReady(formatted) });
+  },
+
+  upsertDeliverable(deliverable) {
+    set((state) => {
+      const exists = state.deliverables.some((item) => item.id === deliverable.id);
+      const nextDeliverables = exists
+        ? state.deliverables.map((item) => (item.id === deliverable.id ? deliverable : item))
+        : [...state.deliverables, deliverable];
+      return {
+        deliverables: nextDeliverables,
+        exportReady: computeExportReady(nextDeliverables),
+      };
+    });
+  },
+
+  updateDeliverableStatus(deliverableId, status) {
+    set((state) => {
+      const next = state.deliverables.map((deliverable) =>
+        deliverable.id === deliverableId ? { ...deliverable, status } : deliverable,
+      );
+      return { deliverables: next, exportReady: computeExportReady(next) };
+    });
+  },
+
+  toggleChecklistItem(deliverableId, itemId, done) {
+    set((state) => {
+      const nextDeliverables = state.deliverables.map((deliverable) => {
+        if (deliverable.id !== deliverableId) {
+          return deliverable;
+        }
+        return {
+          ...deliverable,
+          checklistItems: deliverable.checklistItems.map((item) =>
+            item.id === itemId ? { ...item, done } : item,
+          ),
+        };
+      });
+      return {
+        deliverables: nextDeliverables,
+        exportReady: computeExportReady(nextDeliverables),
+      };
+    });
+  },
+
+  setContent(content) {
+    set({ draftContent: content });
+  },
+
+  setCursor({ sectionId, cursor }) {
+    set({ lastCursor: cursor, focusedSectionId: sectionId ?? null });
+  },
+
+  addLlmChange({ highlight, ...payload }) {
+    const change: DraftLlmChange = {
+      ...payload,
+      highlight: highlight ?? true,
+    };
+    set((state) => ({
+      llmChanges: [
+        ...state.llmChanges.map((entry) => ({ ...entry, highlight: false })),
+        change,
+      ],
+    }));
   },
 
   clearHighlight() {
@@ -133,54 +294,132 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
     }));
   },
 
-  addToDraft({ text, summary, sourceMessageId }) {
+  highlightChange(changeId) {
+    set((state) => ({
+      llmChanges: state.llmChanges.map((change) => ({
+        ...change,
+        highlight: change.id === changeId,
+      })),
+    }));
+  },
+
+  addToDraft({ sectionId, text, summary, runId, highlightAnchor, sourceMessageId }) {
     const trimmed = text.trim();
     if (!trimmed) {
       set({
         toast: { id: createId(), message: 'Unable to add empty content to draft.', tone: 'error' },
       });
       trackCounter('add_to_draft_fail');
-      console.warn('[draft-store]', { event: 'add_to_draft_fail', reason: 'empty_payload' });
       return;
     }
 
-    const { content, lastCursor } = get();
+    const state = get();
+    const targetSectionId = sectionId ?? state.focusedSectionId ?? state.sections[0]?.id ?? null;
 
-    let nextContent: string;
-    if (lastCursor !== null) {
-      const before = content.slice(0, lastCursor);
-      const after = content.slice(lastCursor);
-      nextContent = `${before}${before.endsWith('\n') ? '' : '\n'}${trimmed}${after.startsWith('\n') ? '' : '\n'}${after}`.trim();
-    } else {
-      nextContent = content ? `${content.trim()}\n\n${trimmed}` : trimmed;
+    if (!targetSectionId) {
+      const nextContent = state.draftContent
+        ? `${state.draftContent.trim()}\n\n${trimmed}`
+        : trimmed;
+
+      const change: DraftLlmChange = {
+        id: createId(),
+        runId,
+        sectionId: null,
+        summary: summary.trim() || 'Draft update',
+        insertedText: trimmed,
+        createdAt: new Date().toISOString(),
+        approvedByUser: true,
+        highlightAnchor: highlightAnchor ?? null,
+        highlight: true,
+        sourceMessageId,
+      };
+
+      set({
+        draftContent: nextContent,
+        llmChanges: [
+          ...state.llmChanges.map((entry) => ({ ...entry, highlight: false })),
+          change,
+        ],
+        toast: { id: createId(), message: 'Added to draft', tone: 'success' },
+      });
+      trackCounter('add_to_draft_success');
+      return;
     }
 
-    const newChange: DraftLlmChange = {
+    const sections = state.sections.length
+      ? state.sections
+      : [
+          {
+            id: targetSectionId,
+            heading: 'Draft',
+            content: '',
+            order: 0,
+          },
+        ];
+
+    const updatedSections = sections.map((section) => {
+      if (section.id !== targetSectionId) {
+        return section;
+      }
+
+      const insertionPoint =
+        state.focusedSectionId === section.id && typeof state.lastCursor === 'number'
+          ? state.lastCursor
+          : section.content.length;
+
+      const before = section.content.slice(0, insertionPoint);
+      const after = section.content.slice(insertionPoint);
+      const needsLeadingBreak = before.length > 0 && !/\n$/.test(before);
+      const needsTrailingBreak = after.length > 0 && !/^\n/.test(after);
+      const inserted = `${needsLeadingBreak ? '\n\n' : ''}${trimmed}${needsTrailingBreak ? '\n\n' : ''}`;
+      const nextContent = `${before}${inserted}${after}`.replace(/\n{3,}/g, '\n\n');
+      const startOffset = before.length + (needsLeadingBreak ? 2 : 0);
+      const endOffset = startOffset + trimmed.length;
+
+      return {
+        ...section,
+        content: nextContent,
+      };
+    });
+
+    const newContent = joinSections(updatedSections);
+    const anchor: HighlightAnchor = highlightAnchor ?? {
+      startOffset: state.focusedSectionId === targetSectionId && typeof state.lastCursor === 'number'
+        ? state.lastCursor
+        : state.sections.find((section) => section.id === targetSectionId)?.content.length ?? 0,
+      endOffset: (state.focusedSectionId === targetSectionId && typeof state.lastCursor === 'number'
+        ? state.lastCursor
+        : state.sections.find((section) => section.id === targetSectionId)?.content.length ?? 0) + trimmed.length,
+    };
+
+    const change: DraftLlmChange = {
       id: createId(),
-      summary: summary.trim() || 'Inserted draft content',
-      content: trimmed,
+      runId,
+      sectionId: targetSectionId,
+      summary: summary.trim() || 'Draft update',
+      insertedText: trimmed,
       createdAt: new Date().toISOString(),
+      approvedByUser: true,
+      highlightAnchor: anchor,
       highlight: true,
       sourceMessageId,
     };
 
-    set((state) => ({
-      content: nextContent,
-      llmChanges: [...state.llmChanges.map((change) => ({ ...change, highlight: false })), newChange],
+    set({
+      sections: updatedSections,
+      draftContent: newContent,
+      llmChanges: [
+        ...state.llmChanges.map((entry) => ({ ...entry, highlight: false })),
+        change,
+      ],
       toast: { id: createId(), message: 'Added to draft', tone: 'success' },
-    }));
-    trackCounter('add_to_draft_success');
-    console.info('[draft-store]', {
-      event: 'add_to_draft_success',
-      sourceMessageId,
-      charactersInserted: trimmed.length,
     });
+    trackCounter('add_to_draft_success');
   },
 
   registerError(message) {
     set({ toast: { id: createId(), message, tone: 'error' } });
     trackCounter('add_to_draft_fail');
-    console.error('[draft-store]', { event: 'add_to_draft_error', message });
   },
 
   clearToast() {
@@ -189,7 +428,7 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
 
   parseChecklist(rawChecklist) {
     const lines = rawChecklist
-      .split(/\r?\n/) 
+      .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
 
@@ -201,7 +440,14 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
         id: createId(),
         title: withoutPrefix,
         description: '',
-        sectionHint: withoutPrefix.split(':')[0],
+        status: 'todo',
+        checklistItems: [
+          {
+            id: createId(),
+            text: withoutPrefix,
+            done: false,
+          },
+        ],
       });
     }
     return results;
@@ -209,27 +455,28 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
 
   mapDeliverablesToSections(items) {
     const sections = new Map<string, DraftSection>();
-    items.forEach((item) => {
-      const hint = item.sectionHint || item.title.split(':')[0];
-      const heading = hint.replace(/deliverable/i, '').trim() || 'Additional Deliverables';
-      const sectionKey = heading.toLowerCase();
-      const existing = sections.get(sectionKey);
+    items.forEach((item, index) => {
+      const heading = item.title.split(':')[0].trim() || 'Additional Deliverables';
+      const key = heading.toLowerCase();
+      const existing = sections.get(key);
       const bullet = `- ${item.title}${item.description ? ` — ${item.description}` : ''}`;
 
       if (existing) {
-        existing.body = `${existing.body}\n${bullet}`.trim();
-        existing.deliverableIds.push(item.id);
+        sections.set(key, {
+          ...existing,
+          content: `${existing.content}\n${bullet}`.trim(),
+        });
       } else {
-        sections.set(sectionKey, {
+        sections.set(key, {
           id: createId(),
           heading,
-          body: bullet,
-          deliverableIds: [item.id],
+          content: bullet,
+          order: index,
         });
       }
     });
 
-    return Array.from(sections.values());
+    return Array.from(sections.values()).sort((a, b) => a.order - b.order);
   },
 
   composeProposalFromChecklist(items) {
@@ -238,15 +485,22 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
     }
 
     const sections = get().mapDeliverablesToSections(items);
-    const sectionText = sections
-      .map((section) => `## ${section.heading}\n${section.body}`)
-      .join('\n\n');
-
-    const intro = `# Proposal Overview\nThis draft consolidates the current checklist and mapped deliverables into actionable sections.`;
-    const outro = '\n\n---\nGenerated via Draft Intelligence tooling.';
-
-    return `${intro}\n\n${sectionText}${outro}`.trim();
+    const structure = [
+      '# Proposal Overview',
+      'This draft consolidates the latest deliverables and checklist insights. Update each section with project-specific details.',
+      ...sections.map((section) => `## ${section.heading}\n${section.content}`),
+      '\n---\nGenerated from checklist context.',
+    ];
+    return structure.filter(Boolean).join('\n\n').trim();
   },
 }));
 
-export type { DraftDeliverable, DraftLlmChange, DraftSection };
+export type {
+  DraftChecklistItem,
+  DraftDeliverable,
+  DraftLlmChange,
+  DraftRunMeta,
+  DraftSection,
+  DeliverableStatus,
+  HighlightAnchor,
+};
