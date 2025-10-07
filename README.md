@@ -1,5 +1,7 @@
 # MicroTech Platform
 
+![API coverage](https://img.shields.io/badge/api%20coverage-pending-lightgrey)
+
 > **Professional FedRAMP Proposal Assistance and Recruiting Platform**
 
 A comprehensive, enterprise-grade platform built with modern React frontend, Node.js backend, and Azure cloud infrastructure. Designed to streamline proposal management and recruiting workflows with AI-powered assistance.

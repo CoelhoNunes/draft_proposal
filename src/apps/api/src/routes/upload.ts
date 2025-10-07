@@ -3,12 +3,12 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { ChatService, ChatConfig } from '@microtech/ai';
-import { config } from '../config/index.js';
+import { ChatService } from '@microtech/ai';
+import { config } from '../config';
 
 export async function uploadRoutes(fastify: FastifyInstance) {
   // Analyze a PDF using the LLM (simple text passthrough for now)
@@ -23,7 +23,7 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         await file.toBuffer();
       }
 
-      const chatConfig: ChatConfig = {
+      const chatConfig = {
         provider: config.ai.provider as any,
         apiKey: config.ai.apiKey,
         baseUrl: config.ai.baseUrl,
@@ -31,6 +31,10 @@ export async function uploadRoutes(fastify: FastifyInstance) {
         temperature: config.ai.temperature,
         maxTokens: config.ai.maxTokens,
       };
+      if (!chatConfig.apiKey) {
+        reply.status(503);
+        return { success: false, error: 'AI chat service is not configured' };
+      }
       const chatService = new ChatService(chatConfig);
 
       const prompt = `You are a FedRAMP proposal assistant. The user uploaded a proposal PDF named "${uploadedFileName}".

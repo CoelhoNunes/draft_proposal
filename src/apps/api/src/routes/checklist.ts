@@ -3,7 +3,7 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 
 export async function checklistRoutes(fastify: FastifyInstance) {
   // TODO: Implement checklist routes

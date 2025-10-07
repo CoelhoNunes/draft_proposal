@@ -7,11 +7,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "pnpm run build && node --test \"./tests/**/*.test.mjs\""
   },
   "dependencies": {
-    "uuid": "^9.0.1",
-    "zod": "^3.22.4"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/uuid": "^9.0.8",

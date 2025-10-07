@@ -3,7 +3,7 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 
 export async function changeRoutes(fastify: FastifyInstance) {
   // TODO: Implement change routes

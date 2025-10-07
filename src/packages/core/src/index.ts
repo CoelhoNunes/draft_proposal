@@ -13,3 +13,6 @@ export * from './validators';
 
 // Utilities
 export * from './utils';
+
+// Validation primitives
+export { z, ZodError, type Schema } from './z';

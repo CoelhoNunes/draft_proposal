@@ -11,7 +11,7 @@ export interface ChatProvider {
 }
 
 export interface ChatConfig {
-  provider: 'openai' | 'azure' | 'custom';
+  provider: 'openai' | 'azure' | 'custom' | 'mock';
   apiKey?: string;
   baseUrl?: string;
   model: string;
@@ -119,15 +119,62 @@ Generate an edit proposal:
   }
 }
 
+class LocalMockChatProvider implements ChatProvider {
+  constructor(private readonly config: ChatConfig) {}
+
+  async chat(messages: ChatMessage[]): Promise<string> {
+    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+    const intro =
+      '🤖 Mock Assistant (no API key configured)\n\n' +
+      'This environment is running without an external AI provider. Responses are generated locally for testing.';
+
+    if (!lastUserMessage) {
+      return `${intro}\n\nHow can I assist you today?`;
+    }
+
+    const summary = lastUserMessage.content.length > 400
+      ? `${lastUserMessage.content.slice(0, 397)}...`
+      : lastUserMessage.content;
+
+    return `${intro}\n\nYou said: "${summary}".\n\n` +
+      'In a production environment this reply would contain a fully reasoned answer powered by your configured AI provider.';
+  }
+
+  async generateEditProposal(context: string, instruction: string): Promise<AIEditProposal> {
+    return {
+      summary: `Mock edit for instruction: ${instruction}`,
+      operations: [
+        {
+          type: 'insert',
+          anchor: 'end',
+          content: `Applied instruction "${instruction}" to context snippet: ${context.slice(0, 200)}`,
+          metadata: {
+            provider: 'mock',
+            model: this.config.model,
+          },
+        },
+      ],
+    };
+  }
+}
+
 export class ChatService {
   private provider: ChatProvider;
 
   constructor(config: ChatConfig) {
+    if ((config.provider === 'openai' || config.provider === 'azure' || config.provider === 'custom') && !config.apiKey) {
+      this.provider = new LocalMockChatProvider({ ...config, provider: 'mock' });
+      return;
+    }
+
     switch (config.provider) {
       case 'openai':
       case 'azure':
       case 'custom':
         this.provider = new OpenAIChatProvider(config);
+        break;
+      case 'mock':
+        this.provider = new LocalMockChatProvider(config);
         break;
       default:
         throw new Error(`Unsupported provider: ${config.provider}`);
