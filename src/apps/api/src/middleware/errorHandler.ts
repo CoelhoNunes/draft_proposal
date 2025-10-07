@@ -3,19 +3,22 @@
  */
 
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
-import { ZodError } from 'zod';
-import { logger } from '../utils/logger.js';
-import { config } from '../config/index.js';
+import { ZodError } from '@microtech/core';
+import { logger } from '../utils/logger';
+import { config } from '../config';
 
 export async function errorHandler(
   error: FastifyError,
   request: FastifyRequest,
   reply: FastifyReply
 ) {
+  const errorMessage = error instanceof Error ? error.message : 'Unexpected error';
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
   // Log the error
   logger.error({
-    error: error.message,
-    stack: error.stack,
+    error: errorMessage,
+    stack: errorStack,
     request: {
       method: request.method,
       url: request.url,
@@ -26,10 +29,9 @@ export async function errorHandler(
   // Handle different error types
   if (error instanceof ZodError) {
     // Validation errors
-    const validationErrors = error.errors.map(err => ({
-      field: err.path.join('.'),
-      message: err.message,
-      code: err.code,
+    const validationErrors = error.issues.map((issue) => ({
+      field: issue.path.join('.'),
+      message: issue.message,
     }));
 
     return reply.status(400).send({
@@ -39,22 +41,22 @@ export async function errorHandler(
     });
   }
 
-  if (error.statusCode) {
+  if (typeof error.statusCode === 'number') {
     // HTTP errors
     return reply.status(error.statusCode).send({
       success: false,
-      error: error.message,
-      ...(config.logging.level === 'debug' && { stack: error.stack }),
+      error: errorMessage,
+      ...(config.logging.level === 'debug' && { stack: errorStack }),
     });
   }
 
   // Default error response
-  const statusCode = error.statusCode || 500;
-  const message = config.logging.level === 'debug' ? error.message : 'Internal server error';
+  const statusCode = typeof error.statusCode === 'number' ? error.statusCode : 500;
+  const message = config.logging.level === 'debug' ? errorMessage : 'Internal server error';
 
   return reply.status(statusCode).send({
     success: false,
     error: message,
-    ...(config.logging.level === 'debug' && { stack: error.stack }),
+    ...(config.logging.level === 'debug' && { stack: errorStack }),
   });
 }

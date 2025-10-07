@@ -3,13 +3,21 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { z } from 'zod';
-import { Workspace, CreateWorkspaceSchema, UpdateWorkspaceSchema } from '@microtech/core';
-import { logger } from '../utils/logger.js';
+import { z, CreateWorkspaceSchema, UpdateWorkspaceSchema } from '@microtech/core';
+import { logger } from '../utils/logger';
 
 const workspaceParamsSchema = z.object({
   id: z.string().uuid(),
 });
+
+type Workspace = {
+  id: string;
+  kind: 'proposal' | 'recruiting';
+  title: string;
+  ownerId: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export async function workspaceRoutes(fastify: FastifyInstance) {
   // Get all workspaces for user
@@ -74,7 +82,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         data: mockWorkspaces,
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to get workspaces');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Failed to get workspaces');
       throw error;
     }
   });
@@ -119,7 +128,11 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ success: false, error: 'Unauthorized' });
       }
 
-      const { kind, title } = CreateWorkspaceSchema.parse(request.body);
+      const payload = CreateWorkspaceSchema.parse(request.body as unknown) as {
+        kind: Workspace['kind'];
+        title: string;
+      };
+      const { kind, title } = payload;
 
       logger.info({ userId, kind, title }, 'Creating new workspace');
 
@@ -138,7 +151,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         data: newWorkspace,
       });
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to create workspace');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Failed to create workspace');
       throw error;
     }
   });
@@ -201,7 +215,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         data: mockWorkspace,
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to get workspace');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Failed to get workspace');
       throw error;
     }
   });
@@ -253,7 +268,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ success: false, error: 'Unauthorized' });
       }
 
-      const updateData = UpdateWorkspaceSchema.parse(request.body);
+      const updateData = UpdateWorkspaceSchema.parse(request.body as any);
 
       logger.info({ userId, workspaceId: id, updateData }, 'Updating workspace');
 
@@ -272,7 +287,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         data: updatedWorkspace,
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to update workspace');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Failed to update workspace');
       throw error;
     }
   });
@@ -317,7 +333,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         message: 'Workspace deleted successfully',
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Failed to delete workspace');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Failed to delete workspace');
       throw error;
     }
   });

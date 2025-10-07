@@ -3,10 +3,10 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { z } from 'zod';
+import { z } from '@microtech/core';
 import { ChatService, ChatConfig } from '@microtech/ai';
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 
 const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
@@ -27,8 +27,12 @@ const editRequestSchema = z.object({
 
 export async function chatRoutes(fastify: FastifyInstance) {
   // Initialize chat service
+  const provider: ChatConfig['provider'] = config.ai.apiKey
+    ? (config.ai.provider === 'azure' || config.ai.provider === 'custom' ? config.ai.provider : 'openai')
+    : 'mock';
+
   const chatConfig: ChatConfig = {
-    provider: config.ai.provider as any,
+    provider,
     apiKey: config.ai.apiKey,
     baseUrl: config.ai.baseUrl,
     model: config.ai.model,
@@ -37,6 +41,10 @@ export async function chatRoutes(fastify: FastifyInstance) {
   };
 
   const chatService = new ChatService(chatConfig);
+
+  if (provider === 'mock') {
+    logger.warn('AI chat service running in mock mode - configure OPENAI_KEY for production-grade responses');
+  }
 
   // Send chat message
   fastify.post('/send', {
@@ -81,7 +89,14 @@ export async function chatRoutes(fastify: FastifyInstance) {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { message, context, model, temperature } = chatRequestSchema.parse(request.body);
+      const {
+        message,
+        context,
+        model: _modelOverride,
+        temperature: _temperatureOverride,
+      } = chatRequestSchema.parse(request.body);
+      void _modelOverride;
+      void _temperatureOverride;
 
       logger.info({
         userId: request.user?.id,
@@ -90,9 +105,10 @@ export async function chatRoutes(fastify: FastifyInstance) {
       }, 'Chat message received');
 
       // Create chat message
+      const workspaceId = context?.workspaceId ?? 'workspace-default';
       const chatMessage = context?.tab === 'recruiting'
-        ? chatService.createRecruitingMessage(message, context.workspaceId)
-        : chatService.createProposalMessage(message, context.workspaceId);
+        ? chatService.createRecruitingMessage(message, workspaceId)
+        : chatService.createProposalMessage(message, workspaceId);
 
       // Send message to AI
       const response = await chatService.sendMessage([chatMessage]);
@@ -110,7 +126,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
         data: responseMessage,
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Chat message failed');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Chat message failed');
       throw error;
     }
   });
@@ -174,7 +191,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
         data: editProposal,
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Edit proposal failed');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Edit proposal failed');
       throw error;
     }
   });
@@ -268,7 +286,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
         },
       };
     } catch (error) {
-      logger.error({ error: error.message }, 'Chat history retrieval failed');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ error: message }, 'Chat history retrieval failed');
       throw error;
     }
   });

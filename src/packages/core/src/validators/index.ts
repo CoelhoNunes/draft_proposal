@@ -2,14 +2,23 @@
  * @fileoverview Shared validation utilities and schemas
  */
 
-import { z } from 'zod';
-import { 
-  UserSchema, 
-  WorkspaceSchema, 
-  DocumentSchema, 
-  ChecklistItemSchema, 
-  ChangeSchema 
+import { z } from '../z';
+import {
+  UserSchema,
+  WorkspaceSchema,
+  DocumentSchema,
+  ChecklistItemSchema,
+  ChangeSchema
 } from '../types';
+
+type SafeParseResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: { errors: Array<{ path: (string | number)[]; message: string }> } };
+
+interface ValidationSchema<T> {
+  parse(data: unknown): T;
+  safeParse(data: unknown): SafeParseResult<T>;
+}
 
 // API validation schemas
 export const CreateWorkspaceSchema = z.object({
@@ -67,11 +76,13 @@ export const FileUploadSchema = z.object({
 export const ExportRequestSchema = z.object({
   workspaceId: z.string().uuid(),
   format: z.enum(['pdf', 'docx']),
-  options: z.object({
-    includeHighlights: z.boolean().default(false),
-    includeComments: z.boolean().default(false),
-    template: z.string().optional(),
-  }).default({}),
+  options: z
+    .object({
+      includeHighlights: z.boolean().default(false),
+      includeComments: z.boolean().default(false),
+      template: z.string().optional(),
+    })
+    .default({ includeHighlights: false, includeComments: false, template: undefined }),
 });
 
 // Utility validation functions
@@ -109,7 +120,7 @@ export class ValidationError extends Error {
 }
 
 export function validateAndThrow<T>(
-  schema: z.ZodSchema<T>,
+  schema: ValidationSchema<T>,
   data: unknown,
   errorPrefix = 'Validation failed'
 ): T {

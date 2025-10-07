@@ -3,9 +3,9 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import jwt from 'jsonwebtoken';
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
+import { config } from '../config';
+import { logger } from '../utils/logger';
+import { sign as signJwt, verify as verifyJwt } from '../utils/jwt';
 
 interface AuthenticatedRequest extends FastifyRequest {
   user?: {
@@ -50,8 +50,16 @@ export async function authMiddleware(fastify: FastifyInstance) {
 
     try {
       // Verify JWT token
-      const decoded = jwt.verify(token, config.auth.jwtSecret) as any;
-      
+      const decoded = verifyJwt(token, config.auth.jwtSecret) as {
+        id?: string;
+        email?: string;
+        name?: string;
+      };
+
+      if (!decoded || typeof decoded !== 'object' || !decoded.id || !decoded.email || !decoded.name) {
+        throw new Error('Malformed token payload');
+      }
+
       // Set user information
       request.user = {
         id: decoded.id,
@@ -61,8 +69,9 @@ export async function authMiddleware(fastify: FastifyInstance) {
 
       logger.debug({ userId: decoded.id }, 'User authenticated');
     } catch (error) {
-      logger.warn({ error: error.message }, 'Authentication failed');
-      
+      const message = error instanceof Error ? error.message : 'Unknown authentication failure';
+      logger.warn({ error: message }, 'Authentication failed');
+
       return reply.status(401).send({
         success: false,
         error: 'Invalid or expired token',
@@ -73,7 +82,7 @@ export async function authMiddleware(fastify: FastifyInstance) {
 
 // Helper function to generate JWT token
 export function generateToken(user: { id: string; email: string; name: string }): string {
-  return jwt.sign(
+  return signJwt(
     {
       id: user.id,
       email: user.email,
@@ -88,7 +97,7 @@ export function generateToken(user: { id: string; email: string; name: string })
 
 // Helper function to verify JWT token
 export function verifyToken(token: string): any {
-  return jwt.verify(token, config.auth.jwtSecret);
+  return verifyJwt(token, config.auth.jwtSecret);
 }
 
 declare module 'fastify' {

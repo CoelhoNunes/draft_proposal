@@ -2,7 +2,13 @@
  * @fileoverview Core domain types and interfaces for the MicroTech platform
  */
 
-import { z } from 'zod';
+import { z } from '../z';
+
+type InferSchema<T extends { parse: (value: unknown) => unknown }> = T extends {
+  parse: (value: unknown) => infer U;
+}
+  ? U
+  : never;
 
 // Base entity schemas
 export const UserSchema = z.object({
@@ -50,11 +56,11 @@ export const ChangeSchema = z.object({
 });
 
 // Type exports
-export type User = z.infer<typeof UserSchema>;
-export type Workspace = z.infer<typeof WorkspaceSchema>;
-export type Document = z.infer<typeof DocumentSchema>;
-export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
-export type Change = z.infer<typeof ChangeSchema>;
+export type User = InferSchema<typeof UserSchema>;
+export type Workspace = InferSchema<typeof WorkspaceSchema>;
+export type Document = InferSchema<typeof DocumentSchema>;
+export type ChecklistItem = InferSchema<typeof ChecklistItemSchema>;
+export type Change = InferSchema<typeof ChangeSchema>;
 
 // Workspace-specific types
 export interface ProposalWorkspace extends Workspace {
