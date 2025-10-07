@@ -1,19 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, Plus, Send } from 'lucide-react';
 import { DraftEditor } from '@/components/DraftEditor';
 import { ChangeLog } from '@/components/ChangeLog';
 import { useDraftStore, DeliverableStatus, DraftDeliverable } from '@/store/draftStore';
 import { useChatStore } from '@/store/chatStore';
-import { listProjectDrafts, openArchivedRun } from '@/api/drafts';
 import {
+  createRun,
+  planRun,
   commitLlmChange,
   exportRun,
   updateChecklistItem,
   updateDeliverableStatus as updateDeliverableStatusApi,
+  listArchives,
+  getArchiveById,
+  type RunResponse,
+  type ChatSuggestionResponse,
+  updateSuggestionStatusRemote,
 } from '@/api/runs';
 
 const PROJECT_ID = '11111111-1111-1111-1111-111111111111';
 const WORKSPACE_ID = 'proposal-workspace';
+const COMPANY_PROMPT =
+  'MicroTech delivers secure federal cloud solutions focused on FedRAMP compliance, continuous monitoring, and rapid authorization support.';
 
 const statusOptions: { value: DeliverableStatus; label: string }[] = [
   { value: 'todo', label: 'To Do' },
@@ -28,12 +36,11 @@ const createId = () =>
 
 type ArchiveItem = {
   id: string;
+  runId: string;
   fileName: string;
   title: string;
   updatedAt: string;
 };
-
-type ChatMessageState = 'pending' | 'inserted' | 'dismissed';
 
 const Button = ({ children, className, onClick, type = 'button', disabled, ...props }: any) => (
   <button
@@ -61,6 +68,9 @@ export function ProposalPage() {
     highlightChange,
     exportReady,
     run,
+    hydrateFromRun,
+    lastCursor,
+    focusedSectionId,
   } = useDraftStore();
   const {
     messages,
@@ -69,6 +79,9 @@ export function ProposalPage() {
     error,
     setContext,
     openChat,
+    hydrateMessages,
+    setRun: setChatRun,
+    updateSuggestionStatus,
   } = useChatStore();
 
   const [archiveItems, setArchiveItems] = useState<ArchiveItem[]>([]);
@@ -78,10 +91,13 @@ export function ProposalPage() {
   const [isAddingDeliverable, setIsAddingDeliverable] = useState(false);
   const [newDeliverableTitle, setNewDeliverableTitle] = useState('');
   const [newDeliverableDescription, setNewDeliverableDescription] = useState('');
-  const [chatStates, setChatStates] = useState<Record<string, ChatMessageState>>({});
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setContext({ workspaceId: WORKSPACE_ID, tab: 'proposals' });
@@ -93,21 +109,23 @@ export function ProposalPage() {
   }, []);
 
   useEffect(() => {
-    const latestAssistant = messages
-      .slice()
-      .reverse()
-      .find((message) => message.role === 'assistant');
-    if (latestAssistant && !chatStates[latestAssistant.id]) {
-      setChatStates((prev) => ({ ...prev, [latestAssistant.id]: 'pending' }));
-    }
-  }, [messages, chatStates]);
+    setChatRun(run?.id ?? null);
+  }, [run?.id, setChatRun]);
 
   const refreshArchive = async () => {
     try {
       setIsArchiveLoading(true);
       setArchiveError(null);
-      const response = await listProjectDrafts(PROJECT_ID);
-      setArchiveItems(response.data ?? []);
+      const entries = await listArchives();
+      setArchiveItems(
+        entries.map((item) => ({
+          id: item.id,
+          runId: item.runId,
+          title: item.title || item.fileName,
+          fileName: item.fileName,
+          updatedAt: item.updatedAt,
+        })),
+      );
     } catch (err: any) {
       setArchiveError(err?.message || 'Unable to load archive');
     } finally {
@@ -117,10 +135,36 @@ export function ProposalPage() {
 
   const handleOpenArchivedRun = async (id: string) => {
     try {
-      const result = await openArchivedRun(id);
-      if (result?.data) {
-        setDeliverables(result.data.deliverables ?? []);
-      }
+      const runData = await getArchiveById(id);
+      setUploadError(null);
+      setUploadSuccess(null);
+      hydrateFromRun({
+        meta: {
+          id: runData.id,
+          projectId: runData.projectId,
+          runName: runData.runName,
+          fileName: runData.fileName,
+          createdAt: runData.createdAt,
+          updatedAt: runData.updatedAt,
+          status: runData.status,
+          pdfMeta: runData.pdfMeta ? { ...runData.pdfMeta } : null,
+        },
+        sections: runData.sections.map((section) => ({
+          id: section.id,
+          heading: section.heading,
+          content: section.content,
+          order: section.order,
+        })),
+        deliverables: runData.deliverables.map((deliverable) => ({
+          ...deliverable,
+        })),
+        changes: runData.llmChanges.map((change) => ({
+          ...change,
+          highlight: false,
+        })),
+      });
+      hydrateMessages(runData.id, runData.chat ?? []);
+      setChatRun(runData.id);
     } catch (err) {
       console.error('Unable to open archive', err);
     }
@@ -150,6 +194,7 @@ export function ProposalPage() {
     }
     const next: DraftDeliverable = {
       id: createId(),
+      runId: run?.id,
       title: newDeliverableTitle.trim(),
       description: newDeliverableDescription.trim(),
       status: 'todo',
@@ -167,24 +212,126 @@ export function ProposalPage() {
     setIsAddingDeliverable(false);
   };
 
-  const handleAddChatSuggestion = async (messageId: string, content: string) => {
-    if (!content.trim()) {
+  const processUpload = async (file: File) => {
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    setExportError(null);
+    setExportSuccess(null);
+    try {
+      let baseName = file.name.replace(/\.[^.]+$/, '').trim() || `Proposal Run ${new Date().toLocaleDateString()}`;
+      let createdRun: RunResponse | null = null;
+      while (!createdRun) {
+        try {
+          createdRun = await createRun({
+            runName: baseName,
+            fileName: file.name,
+            projectId: PROJECT_ID,
+          });
+        } catch (err: any) {
+          const suggested: string | undefined = err?.suggestedName;
+          const promptMessage = err?.message || 'Run name already exists. Please choose another name.';
+          const nextName = window.prompt(
+            `${promptMessage}${suggested ? `\nSuggested name: ${suggested}` : ''}`,
+            suggested || `${baseName}-1`,
+          );
+          if (!nextName) {
+            setUploadError('Upload cancelled. Provide a unique run name to continue.');
+            setIsUploading(false);
+            return;
+          }
+          baseName = nextName.trim();
+          if (!baseName) {
+            baseName = `Proposal Run ${Date.now()}`;
+          }
+        }
+      }
+
+      const planned = await planRun(createdRun.id, {
+        file,
+        companyPrompt: COMPANY_PROMPT,
+      });
+
+      const runData = planned.run;
+      hydrateFromRun({
+        meta: {
+          id: runData.id,
+          projectId: runData.projectId,
+          runName: runData.runName,
+          fileName: runData.fileName,
+          createdAt: runData.createdAt,
+          updatedAt: runData.updatedAt,
+          status: runData.status,
+          pdfMeta: runData.pdfMeta ? { ...runData.pdfMeta } : null,
+        },
+        sections: runData.sections.map((section) => ({
+          id: section.id,
+          heading: section.heading,
+          content: section.content,
+          order: section.order,
+        })),
+        deliverables: runData.deliverables.map((deliverable) => ({
+          ...deliverable,
+        })),
+        changes: runData.llmChanges.map((change) => ({
+          ...change,
+          highlight: false,
+        })),
+      });
+      hydrateMessages(runData.id, runData.chat ?? []);
+      setChatRun(runData.id);
+      setUploadSuccess(`Draft populated from ${file.name}.`);
+      await refreshArchive();
+    } catch (err: any) {
+      setUploadError(err?.message || 'Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadClick = () => {
+    setUploadError(null);
+    setUploadSuccess(null);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
       return;
     }
-    setChatStates((prev) => ({ ...prev, [messageId]: 'inserted' }));
-    addToDraft({
-      sectionId: sections[0]?.id,
-      text: content,
-      summary: 'Assistant suggestion',
+    event.target.value = '';
+    await processUpload(file);
+  };
+
+  const handleAddChatSuggestion = async (
+    messageId: string,
+    suggestion: ChatSuggestionResponse,
+  ) => {
+    const text = suggestion.content.trim();
+    if (!text) {
+      return;
+    }
+    const change = addToDraft({
+      sectionId: focusedSectionId ?? sections[0]?.id,
+      text,
+      summary: suggestion.summary || 'Assistant suggestion',
       runId: run?.id,
       sourceMessageId: messageId,
     });
+    if (!change) {
+      return;
+    }
+    updateSuggestionStatus(messageId, suggestion.id, 'inserted');
     try {
       if (run?.id) {
         await commitLlmChange(run.id, {
-          sectionId: null,
-          insertedText: content,
-          summary: 'Assistant suggestion',
+          sectionId: change.sectionId,
+          insertedText: change.insertedText,
+          summary: change.summary,
+          anchor: change.highlightAnchor ?? undefined,
+          sourceMessageId: messageId,
+          suggestionId: suggestion.id,
         });
       }
     } catch (err) {
@@ -192,8 +339,16 @@ export function ProposalPage() {
     }
   };
 
-  const handleDismissSuggestion = (messageId: string) => {
-    setChatStates((prev) => ({ ...prev, [messageId]: 'dismissed' }));
+  const handleDismissSuggestion = (messageId: string, suggestionId: string) => {
+    updateSuggestionStatus(messageId, suggestionId, 'dismissed');
+    if (run?.id) {
+      updateSuggestionStatusRemote(run.id, messageId, {
+        suggestionId,
+        status: 'dismissed',
+      }).catch((err) => {
+        console.warn('Unable to persist suggestion dismissal', err);
+      });
+    }
   };
 
   const handleSendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -203,14 +358,17 @@ export function ProposalPage() {
     if (!message.trim()) {
       return;
     }
-    await sendMessage(message.trim());
+    await sendMessage(message.trim(), {
+      sectionId: focusedSectionId ?? null,
+      cursor: lastCursor ?? null,
+    });
     event.currentTarget.reset();
   };
 
   const handleHighlightChange = (changeId: string) => {
     highlightChange(changeId);
     window.requestAnimationFrame(() => {
-      const element = document.querySelector('[data-highlight="true"]');
+      const element = document.querySelector('[data-highlight-active="true"]');
       if (element instanceof HTMLElement) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -226,8 +384,9 @@ export function ProposalPage() {
       setExportError(null);
       setExportSuccess(null);
       setIsExporting(true);
-      const result = await exportRun(run.id);
-      setExportSuccess(result?.message || 'Export requested successfully.');
+      await exportRun(run.id);
+      setExportSuccess('Export recorded. Download will be available shortly.');
+      await refreshArchive();
     } catch (err: any) {
       setExportError(err?.message || 'Export failed. Ensure all deliverables are complete.');
     } finally {
@@ -236,17 +395,24 @@ export function ProposalPage() {
   };
 
   const chatMessages = useMemo(() => {
-    return messages.filter((message) => message.context?.tab === 'proposals');
+    return messages.filter((message) => {
+      if (!message.context) {
+        return true;
+      }
+      return message.context.tab === 'proposals';
+    });
   }, [messages]);
 
-  const renderChatActions = (messageId: string, content: string) => {
-    const state = chatStates[messageId] || 'pending';
-    if (state === 'dismissed') {
+  const renderSuggestionActions = (
+    messageId: string,
+    suggestion: ChatSuggestionResponse,
+  ) => {
+    if (suggestion.status === 'dismissed') {
       return (
         <span className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500">Dismissed</span>
       );
     }
-    if (state === 'inserted') {
+    if (suggestion.status === 'inserted') {
       return (
         <span className="mt-2 inline-flex items-center gap-1 text-xs text-green-600">
           <CheckCircle2 className="h-3 w-3" /> Added to draft
@@ -257,11 +423,14 @@ export function ProposalPage() {
       <div className="mt-2 flex items-center gap-2">
         <Button
           className="bg-blue-600 text-white"
-          onClick={() => handleAddChatSuggestion(messageId, content)}
+          onClick={() => handleAddChatSuggestion(messageId, suggestion)}
         >
-          Add
+          Add to Draft
         </Button>
-        <Button className="border border-gray-200 bg-white" onClick={() => handleDismissSuggestion(messageId)}>
+        <Button
+          className="border border-gray-200 bg-white"
+          onClick={() => handleDismissSuggestion(messageId, suggestion.id)}
+        >
           Cancel
         </Button>
       </div>
@@ -277,8 +446,39 @@ export function ProposalPage() {
             <p className="text-sm text-gray-500">
               Deliverables, draft, and AI collaboration work together. The assistant only updates the draft once you confirm.
             </p>
+            {run?.runName && (
+              <p className="text-xs text-gray-400">Active run: {run.runName}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={handleFileInputChange}
+            />
+            <Button
+              className="bg-blue-600 text-white"
+              onClick={handleUploadClick}
+              disabled={isUploading}
+            >
+              {isUploading ? 'Processing…' : 'Upload PDF'}
+            </Button>
           </div>
         </header>
+
+        {uploadError && (
+          <div className="mb-4 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4" />
+            <span>{uploadError}</span>
+          </div>
+        )}
+        {uploadSuccess && (
+          <div className="mb-4 rounded border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+            {uploadSuccess}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
           <aside className="flex flex-col gap-4" aria-label="Deliverables column">
@@ -422,7 +622,7 @@ export function ProposalPage() {
                       <button
                         type="button"
                         className="w-full rounded border border-gray-200 px-3 py-2 text-left hover:border-blue-300 hover:bg-blue-50"
-                        onClick={() => handleOpenArchivedRun(item.id)}
+                        onClick={() => handleOpenArchivedRun(item.runId)}
                       >
                         <span className="block font-medium text-gray-900">{item.title || item.fileName}</span>
                         <span className="text-gray-500">Updated {new Date(item.updatedAt).toLocaleString()}</span>
@@ -495,7 +695,22 @@ export function ProposalPage() {
                         }`}
                       >
                         <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-                        {message.role === 'assistant' && renderChatActions(message.id, message.content)}
+                        {message.role === 'assistant' && message.suggestions && message.suggestions.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {message.suggestions.map((suggestion) => (
+                              <div
+                                key={suggestion.id}
+                                className="rounded border border-gray-200 bg-gray-50 p-3"
+                              >
+                                <p className="text-xs font-semibold text-gray-600">{suggestion.summary}</p>
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                                  {suggestion.content}
+                                </p>
+                                {renderSuggestionActions(message.id, suggestion)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {isLoading && (

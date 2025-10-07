@@ -1,17 +1,27 @@
 /**
- * @fileoverview Chat state management using Zustand
+ * @fileoverview Chat state management using Zustand with run-aware suggestions
  */
 
 import { create } from 'zustand';
 import { ChatMessage } from '@microtech/core';
+import {
+  requestSuggestions,
+  type ChatEntryResponse,
+  type ChatSuggestionResponse,
+} from '@/api/runs';
+
+interface WorkspaceChatMessage extends ChatMessage {
+  suggestions?: ChatSuggestionResponse[];
+}
 
 interface ChatState {
   isOpen: boolean;
-  messages: ChatMessage[];
+  messages: WorkspaceChatMessage[];
   currentContext: {
     workspaceId: string | null;
     tab: 'proposals' | 'recruiting';
   };
+  currentRunId: string | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -20,13 +30,23 @@ interface ChatActions {
   toggleChat: () => void;
   openChat: () => void;
   closeChat: () => void;
-  addMessage: (message: ChatMessage) => void;
-  setMessages: (messages: ChatMessage[]) => void;
+  addMessage: (message: WorkspaceChatMessage) => void;
+  setMessages: (messages: WorkspaceChatMessage[]) => void;
   clearMessages: () => void;
+  hydrateMessages: (runId: string, entries: ChatEntryResponse[]) => void;
   setContext: (context: { workspaceId: string | null; tab: 'proposals' | 'recruiting' }) => void;
+  setRun: (runId: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  sendMessage: (content: string) => Promise<void>;
+  updateSuggestionStatus: (
+    messageId: string,
+    suggestionId: string,
+    status: ChatSuggestionResponse['status'],
+  ) => void;
+  sendMessage: (
+    content: string,
+    options?: { sectionId?: string | null; cursor?: number | null },
+  ) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
@@ -37,6 +57,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     workspaceId: null,
     tab: 'proposals',
   },
+  currentRunId: null,
   isLoading: false,
   error: null,
 
@@ -52,68 +73,94 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   setMessages: (messages) => set({ messages }),
   clearMessages: () => set({ messages: [] }),
 
+  hydrateMessages: (runId, entries) => {
+    const { currentContext } = get();
+    const formatted: WorkspaceChatMessage[] = entries.map((entry) => ({
+      id: entry.id,
+      role: entry.role,
+      content: entry.content,
+      timestamp: new Date(entry.createdAt),
+      context: currentContext.workspaceId
+        ? { workspaceId: currentContext.workspaceId, tab: currentContext.tab }
+        : undefined,
+      suggestions: entry.suggestions?.map((suggestion) => ({ ...suggestion })),
+    }));
+    set({ messages: formatted, currentRunId: runId });
+  },
+
   setContext: (context) => set({ currentContext: context }),
+
+  setRun: (runId) => set({ currentRunId: runId }),
 
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
 
-  sendMessage: async (content: string) => {
-    const { currentContext, addMessage, setLoading, setError } = get();
-    
+  updateSuggestionStatus: (messageId, suggestionId, status) => {
+    set((state) => ({
+      messages: state.messages.map((message) => {
+        if (message.id !== messageId || !message.suggestions) {
+          return message;
+        }
+        return {
+          ...message,
+          suggestions: message.suggestions.map((suggestion) =>
+            suggestion.id === suggestionId ? { ...suggestion, status } : suggestion,
+          ),
+        };
+      }),
+    }));
+  },
+
+  sendMessage: async (content, options) => {
+    const { currentContext, addMessage, setLoading, setError, currentRunId } = get();
+
+    if (!currentRunId) {
+      setError('Upload a proposal PDF to start a run before using chat suggestions.');
+      return;
+    }
+
     // Add user message
-    const userMessage: ChatMessage = {
+    const userMessage: WorkspaceChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content,
       timestamp: new Date(),
       context: currentContext,
     };
-    
+
     addMessage(userMessage);
     setLoading(true);
     setError(null);
 
     try {
-      // Call the actual API
-      const response = await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: content,
-          context: currentContext,
-        }),
+      const response = await requestSuggestions(currentRunId, {
+        prompt: content,
+        sectionId: options?.sectionId ?? null,
+        cursor: options?.cursor ?? null,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      const data = await response.json();
-      
-      // Add assistant response
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
+      const assistantMessage: WorkspaceChatMessage = {
+        id: response.id,
         role: 'assistant',
-        content: data.data.content,
-        timestamp: new Date(),
+        content: response.content,
+        timestamp: new Date(response.createdAt),
         context: currentContext,
+        suggestions: response.suggestions?.map((suggestion) => ({ ...suggestion })) ?? [],
       };
-      
+
       addMessage(assistantMessage);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred');
-      
+
       // Add error message
-      const errorMessage: ChatMessage = {
+      const errorMessage: WorkspaceChatMessage = {
         id: `error-${Date.now()}`,
         role: 'system',
         content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date(),
         context: currentContext,
       };
-      
+
       addMessage(errorMessage);
     } finally {
       setLoading(false);

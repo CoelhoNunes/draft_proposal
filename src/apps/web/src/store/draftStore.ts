@@ -47,13 +47,13 @@ type DraftLlmChange = {
 
 type DraftRunMeta = {
   id: string;
-  projectId: string;
+  projectId: string | null;
   runName: string;
+  fileName: string;
   createdAt: string;
   updatedAt: string;
-  pdfMeta: { fileId: string; filename: string; pages: number } | null;
-  status: 'draft' | 'final';
-  chatThreadId: string | null;
+  pdfMeta: { filename: string; pages: number } | null;
+  status: 'draft' | 'exported';
 };
 
 type DraftState = {
@@ -66,10 +66,17 @@ type DraftState = {
   focusedSectionId: string | null;
   toast: DraftToast | null;
   exportReady: boolean;
+  activeHighlight: { changeId: string; sectionId: string | null; start: number; end: number } | null;
 };
 
 type DraftActions = {
-  initialiseRun: (meta: DraftRunMeta, sections: DraftSection[], deliverables: DraftDeliverable[]) => void;
+  initialiseRun: (meta: DraftRunMeta, sections: DraftSection[], deliverables: DraftDeliverable[], changes?: DraftLlmChange[]) => void;
+  hydrateFromRun: (payload: {
+    meta: DraftRunMeta;
+    sections: DraftSection[];
+    deliverables: DraftDeliverable[];
+    changes: DraftLlmChange[];
+  }) => void;
   setSections: (sections: DraftSection[]) => void;
   updateSectionContent: (sectionId: string, content: string) => void;
   setDeliverables: (deliverables: DraftDeliverable[]) => void;
@@ -78,7 +85,7 @@ type DraftActions = {
   toggleChecklistItem: (deliverableId: string, itemId: string, done: boolean) => void;
   setContent: (content: string) => void;
   setCursor: (payload: { sectionId: string | null; cursor: number | null }) => void;
-  addLlmChange: (payload: Omit<DraftLlmChange, 'highlight'> & { highlight?: boolean }) => void;
+  addLlmChange: (payload: Omit<DraftLlmChange, 'highlight'> & { highlight?: boolean }) => DraftLlmChange;
   clearHighlight: () => void;
   highlightChange: (changeId: string) => void;
   addToDraft: (payload: {
@@ -88,7 +95,7 @@ type DraftActions = {
     runId?: string;
     highlightAnchor?: HighlightAnchor;
     sourceMessageId?: string;
-  }) => void;
+  }) => DraftLlmChange | null;
   registerError: (message: string) => void;
   clearToast: () => void;
   parseChecklist: (rawChecklist: string) => DraftDeliverable[];
@@ -146,8 +153,9 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
   focusedSectionId: null,
   toast: null,
   exportReady: false,
+  activeHighlight: null,
 
-  initialiseRun(meta, sections, deliverables) {
+  initialiseRun(meta, sections, deliverables, changes = []) {
     const normalisedSections = sections
       .map((section, index) => ({
         ...section,
@@ -172,12 +180,62 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
       })),
     }));
 
+    const changesWithIds = changes.map((change) => ({
+      ...change,
+      id: change.id || createId(),
+      highlight: change.highlight ?? false,
+    }));
+
     set({
       run: meta,
       sections: normalisedSections,
       deliverables: formattedDeliverables,
+      llmChanges: changesWithIds,
       draftContent: joinSections(normalisedSections),
       exportReady: computeExportReady(formattedDeliverables),
+      activeHighlight: null,
+    });
+  },
+
+  hydrateFromRun({ meta, sections, deliverables, changes }) {
+    const normalisedSections = sections
+      .map((section, index) => ({
+        ...section,
+        id: section.id || createId(),
+        heading: sanitize(section.heading),
+        content: section.content?.trim() || '',
+        order: typeof section.order === 'number' ? section.order : index,
+      }))
+      .sort((a, b) => a.order - b.order);
+    const formattedDeliverables = deliverables.map((deliverable) => ({
+      ...deliverable,
+      id: deliverable.id || createId(),
+      title: sanitize(deliverable.title),
+      description: deliverable.description?.trim() || '',
+      status: deliverable.status || 'todo',
+      checklistItems: (deliverable.checklistItems || []).map((item) => ({
+        ...item,
+        id: item.id || createId(),
+        text: sanitize(item.text),
+        done: Boolean(item.done),
+      })),
+    }));
+    const mappedChanges = changes.map((change) => ({
+      ...change,
+      id: change.id || createId(),
+      highlight: Boolean(change.highlight),
+    }));
+    set({
+      run: {
+        ...meta,
+        pdfMeta: meta.pdfMeta ? { ...meta.pdfMeta } : null,
+      },
+      sections: normalisedSections,
+      deliverables: formattedDeliverables,
+      llmChanges: mappedChanges,
+      draftContent: joinSections(normalisedSections),
+      exportReady: computeExportReady(formattedDeliverables),
+      activeHighlight: null,
     });
   },
 
@@ -285,22 +343,38 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
         ...state.llmChanges.map((entry) => ({ ...entry, highlight: false })),
         change,
       ],
+      activeHighlight: change.highlightAnchor
+        ? { changeId: change.id, sectionId: change.sectionId, start: change.highlightAnchor.startOffset, end: change.highlightAnchor.endOffset }
+        : null,
     }));
+    return change;
   },
 
   clearHighlight() {
     set((state) => ({
       llmChanges: state.llmChanges.map((change) => ({ ...change, highlight: false })),
+      activeHighlight: null,
     }));
   },
 
   highlightChange(changeId) {
-    set((state) => ({
-      llmChanges: state.llmChanges.map((change) => ({
-        ...change,
-        highlight: change.id === changeId,
-      })),
-    }));
+    set((state) => {
+      const change = state.llmChanges.find((entry) => entry.id === changeId);
+      return {
+        llmChanges: state.llmChanges.map((entry) => ({
+          ...entry,
+          highlight: entry.id === changeId,
+        })),
+        activeHighlight: change?.highlightAnchor
+          ? {
+              changeId,
+              sectionId: change.sectionId,
+              start: change.highlightAnchor.startOffset,
+              end: change.highlightAnchor.endOffset,
+            }
+          : null,
+      };
+    });
   },
 
   addToDraft({ sectionId, text, summary, runId, highlightAnchor, sourceMessageId }) {
@@ -341,9 +415,12 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
           change,
         ],
         toast: { id: createId(), message: 'Added to draft', tone: 'success' },
+        activeHighlight: change.highlightAnchor
+          ? { changeId: change.id, sectionId: change.sectionId, start: change.highlightAnchor.startOffset, end: change.highlightAnchor.endOffset }
+          : null,
       });
       trackCounter('add_to_draft_success');
-      return;
+      return change;
     }
 
     const sections = state.sections.length
@@ -413,8 +490,12 @@ export const useDraftStore = create<DraftState & DraftActions>((set, get) => ({
         change,
       ],
       toast: { id: createId(), message: 'Added to draft', tone: 'success' },
+      activeHighlight: change.highlightAnchor
+        ? { changeId: change.id, sectionId: change.sectionId, start: change.highlightAnchor.startOffset, end: change.highlightAnchor.endOffset }
+        : null,
     });
     trackCounter('add_to_draft_success');
+    return change;
   },
 
   registerError(message) {
