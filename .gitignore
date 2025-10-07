@@ -41,6 +41,9 @@ logs/
 *.tmp
 *.temp
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Coverage reports
 coverage/
 *.lcov

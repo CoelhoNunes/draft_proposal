@@ -3,8 +3,8 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 
 export async function healthRoutes(fastify: FastifyInstance) {
   // Basic health check
@@ -46,6 +46,12 @@ export async function healthRoutes(fastify: FastifyInstance) {
           provider: config.ai.provider,
           model: config.ai.model,
           hasApiKey: !!config.ai.apiKey,
+        },
+        rag: {
+          enabled: config.rag.enabled,
+          embeddingModel: config.rag.embeddingModel,
+          hybridTopK: config.rag.hybridTopK,
+          rerankTopK: config.rag.rerankTopK,
         },
         upload: {
           maxFileSize: config.upload.maxFileSize,

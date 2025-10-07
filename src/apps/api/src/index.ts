@@ -15,40 +15,37 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
-import staticFiles from '@fastify/static';
+import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 // Internal modules
-import { config } from './config/index.js';
-import { logger } from './utils/logger.js';
-import { errorHandler } from './middleware/errorHandler.js';
-import { authMiddleware } from './middleware/auth.js';
+import { config } from './config';
+import { logger } from './utils/logger';
+import { errorHandler } from './middleware/errorHandler';
+import { authMiddleware } from './middleware/auth';
 
 // API Route handlers
-import { workspaceRoutes } from './routes/workspaces.js';
-import { documentRoutes } from './routes/documents.js';
-import { checklistRoutes } from './routes/checklist.js';
-import { changeRoutes } from './routes/changes.js';
-import { chatRoutes } from './routes/chat.js';
-import { exportRoutes } from './routes/exports.js';
-import { uploadRoutes } from './routes/upload.js';
-import { healthRoutes } from './routes/health.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { workspaceRoutes } from './routes/workspaces';
+import { documentRoutes } from './routes/documents';
+import { checklistRoutes } from './routes/checklist';
+import { changeRoutes } from './routes/changes';
+import { chatRoutes } from './routes/chat';
+import { exportRoutes } from './routes/exports';
+import { uploadRoutes } from './routes/upload';
+import { draftRoutes } from './routes/drafts';
+import { ragDebugRoutes } from './routes/ragDebug';
+import { healthRoutes } from './routes/health';
 
 export async function createServer() {
   const fastify = Fastify({
-    logger: logger,
+    logger: logger as any,
     trustProxy: true,
   });
 
   // Error handling
-  fastify.setErrorHandler(errorHandler);
+  fastify.setErrorHandler(errorHandler as any);
 
   // Security
   await fastify.register(helmet, {
@@ -82,7 +79,7 @@ export async function createServer() {
   });
 
   // Static files
-  await fastify.register(staticFiles, {
+  await fastify.register(fastifyStatic, {
     root: join(__dirname, '../../public'),
     prefix: '/public/',
   });
@@ -144,6 +141,12 @@ export async function createServer() {
   await fastify.register(chatRoutes, { prefix: '/api/chat' });
   await fastify.register(exportRoutes, { prefix: '/api/exports' });
   await fastify.register(uploadRoutes, { prefix: '/api/upload' });
+  if (config.features.archiveV2) {
+    await fastify.register(draftRoutes, { prefix: '/api' });
+  }
+  if (config.features.strongRag) {
+    await fastify.register(ragDebugRoutes, { prefix: '/api/rag' });
+  }
 
   // Graceful shutdown
   const gracefulShutdown = async (signal: string) => {
@@ -153,7 +156,7 @@ export async function createServer() {
       logger.info('Server closed successfully');
       process.exit(0);
     } catch (error) {
-      logger.error('Error during shutdown:', error);
+      logger.error({ error }, 'Error during shutdown');
       process.exit(1);
     }
   };
@@ -165,18 +168,20 @@ export async function createServer() {
 }
 
 // Start server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
-    const server = await createServer();
-    await server.listen({
-      port: config.server.port,
-      host: config.server.host,
-    });
-    
-    logger.info(`🚀 Server running at ${config.server.scheme}://${config.server.host}:${config.server.port}`);
-    logger.info(`📚 API documentation available at ${config.server.scheme}://${config.server.host}:${config.server.port}/docs`);
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
-  }
+if (require.main === module) {
+  (async () => {
+    try {
+      const server = await createServer();
+      await server.listen({
+        port: config.server.port,
+        host: config.server.host,
+      });
+
+      logger.info(`🚀 Server running at ${config.server.scheme}://${config.server.host}:${config.server.port}`);
+      logger.info(`📚 API documentation available at ${config.server.scheme}://${config.server.host}:${config.server.port}/docs`);
+    } catch (error) {
+      logger.error({ error }, 'Failed to start server');
+      process.exit(1);
+    }
+  })();
 }

@@ -2,8 +2,15 @@
   "extends": "../../../config/tsconfig/base.json",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
+    "module": "CommonJS",
     "moduleResolution": "node",
+    "baseUrl": "./src",
+    "paths": {
+      "@microtech/core": ["../../packages/core/dist"],
+      "@microtech/core/*": ["../../packages/core/dist/*"],
+      "@microtech/ai": ["../../packages/ai/dist"],
+      "@microtech/ai/*": ["../../packages/ai/dist/*"]
+    },
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
