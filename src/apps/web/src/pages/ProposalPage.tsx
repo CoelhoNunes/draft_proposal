@@ -52,7 +52,180 @@ const Progress = ({ value, className }: any) => (
 export function ProposalPage() {
   const [activeTab, setActiveTab] = useState<'checklist' | 'editor' | 'changes'>('editor');
   const [checklistItems, setChecklistItems] = useState<any[]>([]);
-  const [draftContent, setDraftContent] = useState('');
+  const [draftContent, setDraftContent] = useState(`FedRAMP Security Assessment Proposal
+
+Executive Summary
+
+Our proposal is founded on a comprehensive, cost-effective, and secure cloud solution that aligns with NASA's objectives and FedRAMP requirements. We aim to deliver an innovative solution leveraging our rich experience and expertise in cloud computing, cybersecurity, and federal regulations. The core value proposition is to provide a resilient, scalable, and secure cloud environment that enhances NASA's operational efficiency, ensures data protection, and promotes cost savings.
+
+This proposal addresses all critical FedRAMP security requirements through a multi-layered approach that includes:
+
+• Comprehensive security controls implementation
+• Continuous monitoring and compliance verification
+• Robust incident response and contingency planning
+• Staff training and awareness programs
+• Regular audit and assessment procedures
+
+Our approach ensures full compliance with FedRAMP Moderate Impact Level requirements while providing the flexibility and scalability needed for NASA's evolving mission requirements.
+
+Security Controls Implementation
+
+Access Control (AC)
+Our system implements comprehensive access controls including:
+- Multi-factor authentication for all users
+- Role-based access control (RBAC) with principle of least privilege
+- Regular access reviews and recertification
+- Session management with automatic timeouts
+- Privileged access management (PAM) for administrative accounts
+
+Audit and Accountability (AU)
+We maintain detailed audit logs for all system activities including:
+- User authentication and authorization events
+- Data access and modification activities
+- System configuration changes
+- Security-relevant events
+- Log integrity protection and secure storage
+
+Security Assessment and Authorization (CA)
+Our continuous authorization approach includes:
+- Regular vulnerability assessments
+- Penetration testing by certified professionals
+- Security control effectiveness evaluations
+- Risk assessments and mitigation planning
+- Continuous monitoring and reporting
+
+Configuration Management (CM)
+We maintain strict configuration management through:
+- Baseline security configurations
+- Change control procedures
+- Configuration monitoring and compliance verification
+- Automated configuration management tools
+- Regular configuration reviews and updates
+
+Contingency Planning (CP)
+Our comprehensive contingency planning includes:
+- Business continuity plans
+- Disaster recovery procedures
+- Data backup and recovery systems
+- Emergency response procedures
+- Regular testing and validation of contingency measures
+
+Identification and Authentication (IA)
+We implement robust identity and access management:
+- Unique user identification
+- Strong authentication mechanisms
+- Identity proofing and verification
+- Session management controls
+- Authentication failure handling
+
+Incident Response (IR)
+Our incident response capabilities include:
+- 24/7 security operations center (SOC)
+- Incident detection and analysis
+- Response procedures and escalation
+- Post-incident review and improvement
+- Coordination with relevant authorities
+
+Maintenance (MA)
+We maintain system security through:
+- Controlled maintenance procedures
+- Maintenance personnel screening
+- Remote maintenance security
+- Maintenance tools management
+- Maintenance documentation
+
+Media Protection (MP)
+We protect information media through:
+- Media access controls
+- Media marking and labeling
+- Media storage and transportation
+- Media sanitization procedures
+- Media disposal practices
+
+Physical and Environmental Protection (PE)
+We ensure physical security through:
+- Physical access controls
+- Environmental protection measures
+- Personnel access controls
+- Monitoring and logging
+- Emergency procedures
+
+Planning (PL)
+Our security planning includes:
+- Security planning documentation
+- System security plans
+- Rules of behavior
+- Information system security awareness training
+- Privacy impact assessments
+
+Personnel Security (PS)
+We maintain personnel security through:
+- Personnel screening procedures
+- Position risk designations
+- Personnel termination procedures
+- Personnel transfer procedures
+- Access agreements
+
+Risk Assessment (RA)
+Our risk management approach includes:
+- Risk assessments
+- Vulnerability scanning
+- Risk mitigation planning
+- Continuous monitoring
+- Risk reporting and communication
+
+System and Services Acquisition (SA)
+We ensure secure acquisition through:
+- Security requirements definition
+- Supplier security assessments
+- Development process security
+- Acquisition documentation
+- Supply chain security
+
+System and Communications Protection (SC)
+We protect system communications through:
+- Network security controls
+- Boundary protection
+- Cryptographic protection
+- Secure communications
+- Denial of service protection
+
+System and Information Integrity (SI)
+We maintain system integrity through:
+- Information input validation
+- Error handling and logging
+- System monitoring
+- Information output filtering
+- Spam protection
+
+Continuous Monitoring
+
+Our continuous monitoring program provides real-time visibility into system security through:
+- Automated security monitoring tools
+- Regular vulnerability scanning
+- Configuration compliance checking
+- Performance monitoring
+- Security metrics and reporting
+
+Training and Awareness
+
+We provide comprehensive security training including:
+- Initial security awareness training for all personnel
+- Role-specific security training
+- Regular security updates and briefings
+- Incident response training
+- Compliance training programs
+
+Implementation Timeline
+
+Phase 1 (Months 1-3): Initial setup and basic controls
+Phase 2 (Months 4-6): Advanced security controls implementation
+Phase 3 (Months 7-9): Testing and validation
+Phase 4 (Months 10-12): Full deployment and continuous monitoring
+
+Conclusion
+
+This proposal demonstrates our commitment to providing a secure, compliant, and effective cloud solution that meets all FedRAMP requirements while supporting NASA's mission objectives. Our comprehensive approach ensures both immediate compliance and long-term security posture maintenance.`);
   const [changes, setChanges] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
@@ -407,15 +580,8 @@ ${llmChanges.map(change => `- ${change.type}: ${change.content.substring(0, 100)
     setTimeout(() => scrollChatToBottom(), 50);
 
     try {
-      const userRequestedEdit = /\b(add|insert|apply|update|modify|put this in|add to draft)\b/i.test(currentMessage);
-
-      const enhancedPrompt = `You are a single, conversational FedRAMP assistant. Speak naturally and contextually like a helpful expert.
-User message: "${currentMessage}".
-
-Current draft excerpt: "${draftContent.substring(0, 500)}..."
-Checklist items: ${checklistItems.map(item => item.label).join(', ')}
-
-Respond with a short friendly sentence first, then a clear, structured answer tailored to the question (bulleted or numbered when helpful). Be specific and professional, avoid generic filler, and do not repeat earlier advice verbatim. Do not ask to add content to the draft unless the user explicitly requested an edit.`;
+      // Check if user wants to add content to draft
+      const userRequestedEdit = /\b(add|insert|apply|update|modify|put this in|add to draft|add something about|include|write about)\b/i.test(currentMessage);
 
       // Call the backend chat API
       const response = await fetch('http://localhost:3000/api/chat/send', {
@@ -423,7 +589,13 @@ Respond with a short friendly sentence first, then a clear, structured answer ta
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: currentMessage }),
+        body: JSON.stringify({ 
+          message: currentMessage,
+          context: {
+            workspaceId: 'default-workspace',
+            tab: 'proposals'
+          }
+        }),
       });
 
       if (!response.ok) {
@@ -432,24 +604,6 @@ Respond with a short friendly sentence first, then a clear, structured answer ta
 
       const result = await response.json();
       const aiResponse = result.data.content;
-      
-      // Handle LLM suggestions if provided
-      if (result.data.suggestions && result.data.suggestions.length > 0) {
-        setLlmChanges(prev => [...prev, ...result.data.suggestions]);
-        
-        // If it's a draft addition, add it to the draft content
-        result.data.suggestions.forEach((suggestion: any) => {
-          if (suggestion.type === 'draft_addition') {
-            if (suggestion.position === -1) {
-              // Add to bottom
-              setDraftContent(prev => prev + '\n\n' + suggestion.content);
-            } else {
-              // Add at specific position (for future use)
-              setDraftContent(prev => prev + '\n' + suggestion.content);
-            }
-          }
-        });
-      }
       
       const aiMessage = {
         id: Date.now() + 1,
@@ -463,68 +617,79 @@ Respond with a short friendly sentence first, then a clear, structured answer ta
       // Scroll to bottom after AI response
       setTimeout(() => scrollChatToBottom(), 50);
 
+      // If user requested to add content, show suggestion confirmation
       if (userRequestedEdit) {
-        setShowSuggestionConfirmation(true);
-        const suggestions = aiResponse
-          .split('\n')
-          .filter(line => line.trim().startsWith('-') || line.trim().startsWith('•') || /^(\d+\.|\*)\s/.test(line.trim()))
-          .map(line => {
-            const text = line.replace(/^[-•*]\s*/, '').replace(/^(\d+)\.[\s]*/, '');
-            return text.replace(/\*\*/g, '').replace(/\*/g, '');
-          });
-        setPendingSuggestions(suggestions);
+        // Extract content from AI response that should be added to draft
+        const lines = aiResponse.split('\n').filter(line => line.trim());
+        const contentToAdd = lines.join('\n').trim();
+        
+        if (contentToAdd) {
+          setPendingSuggestions([contentToAdd]);
+          setShowSuggestionConfirmation(true);
+        }
       }
     } catch (error) {
       console.error('Chat error:', error);
+      
+      // Add error message to chat
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: "I'm sorry, I encountered an error. Please try again or check your connection.",
+        author: 'ai',
+        timestamp: new Date()
+      };
+      setChatHistory(prev => [...prev, errorMessage]);
+      setTimeout(() => scrollChatToBottom(), 50);
     }
   };
 
   const handleAddSuggestions = () => {
     if (pendingSuggestions.length > 0) {
-      const cleanLines = pendingSuggestions.map(l => l.replace(/\*\*/g, '').replace(/\*/g, ''));
-      const fullContent = '\n\n' + cleanLines.join('\n');
+      // Get current draft content length for positioning
+      const currentLength = draftContent.length;
+      
+      // Clean and prepare content to add
+      const contentToAdd = pendingSuggestions.join('\n\n').trim();
+      const fullContent = currentLength > 0 ? '\n\n' + contentToAdd : contentToAdd;
 
+      // Add to draft content
+      setDraftContent(prev => prev + fullContent);
+
+      // Add to LLM changes with position
       const changeId = Date.now();
-      const initialPosition = draftContent.length;
-      const initialChange: any = {
+      const llmChange: any = {
         id: changeId,
         type: 'llm_added_suggestion',
-        content: '',
+        content: contentToAdd,
         timestamp: new Date(),
-        position: initialPosition
+        position: currentLength
       };
-      setLlmChanges(prev => [...prev, initialChange]);
+      setLlmChanges(prev => [...prev, llmChange]);
 
-      const CHUNK_SIZE = 40;
-      let cursor = 0;
-      const streamInterval = setInterval(() => {
-        const nextChunk = fullContent.slice(cursor, cursor + CHUNK_SIZE);
-        if (!nextChunk) {
-          clearInterval(streamInterval);
-          setChanges(prev => [...prev, {
-            id: Date.now(),
-            author: 'ai',
-            summary: 'AI Content Added to Draft',
-            content: 'AI suggestions added to draft editor',
-            createdAt: new Date()
-          }]);
-          const confirmMessage = { 
-            id: Date.now() + 1, 
-            text: '✅ Suggestions added to your draft and tracked on the right as LLM-added suggestions.', 
-            author: 'ai',
-            timestamp: new Date()
-          };
-          setChatHistory(prev => [...prev, confirmMessage]);
-          setShowSuggestionConfirmation(false);
-          setPendingSuggestions([]);
-          return;
-        }
-        cursor += CHUNK_SIZE;
-        setDraftContent(prev => prev + nextChunk);
-        setLlmChanges(prev => prev.map(c => c.id === changeId ? { ...c, content: (c.content || '') + nextChunk } : c));
-      }, 30);
+      // Add to changes log
+      setChanges(prev => [...prev, {
+        id: Date.now(),
+        author: 'ai',
+        summary: 'AI Content Added to Draft',
+        content: `Added ${contentToAdd.length} characters to draft editor`,
+        createdAt: new Date()
+      }]);
 
-      setActiveTab('editor');
+      // Show confirmation in chat
+      const confirmMessage = { 
+        id: Date.now() + 1, 
+        text: '✅ Content has been added to your draft! You can find it in the LLM Changes panel on the right.', 
+        author: 'ai',
+        timestamp: new Date()
+      };
+      setChatHistory(prev => [...prev, confirmMessage]);
+      
+      // Hide the confirmation panel
+      setShowSuggestionConfirmation(false);
+      setPendingSuggestions([]);
+      
+      // Scroll to bottom to show confirmation
+      setTimeout(() => scrollChatToBottom(), 50);
     }
   };
 
@@ -865,27 +1030,26 @@ Use the checklist on the left to ensure you cover all requirements."
                           onClick={() => {
                             // Highlight the content in the draft
                             const textarea = document.querySelector('textarea');
-                            if (textarea) {
+                            if (textarea && change.position !== undefined && change.content) {
                               textarea.focus();
-                              textarea.setSelectionRange(change.position, change.position + change.content.length);
+                              const startPos = change.position;
+                              const endPos = startPos + change.content.length;
+                              
+                              // Ensure the positions are within bounds
+                              const maxPos = textarea.value.length;
+                              const safeStartPos = Math.min(startPos, maxPos);
+                              const safeEndPos = Math.min(endPos, maxPos);
+                              
+                              if (safeStartPos < safeEndPos) {
+                                textarea.setSelectionRange(safeStartPos, safeEndPos);
+                                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
                             }
                           }}
                           className="text-xs text-blue-600 hover:text-blue-800 underline"
                         >
                           Highlight in draft
                         </button>
-                        <div
-                          onClick={() => {
-                            const textarea = document.querySelector('textarea');
-                            if (textarea) {
-                              textarea.focus();
-                              textarea.setSelectionRange(change.position, change.position + change.content.length);
-                            }
-                          }}
-                          className="mt-2 cursor-pointer text-xs text-blue-600"
-                        >
-                          Jump to section
-                        </div>
                       </div>
                     </div>
                   </Card>

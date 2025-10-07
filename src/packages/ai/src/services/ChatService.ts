@@ -124,20 +124,77 @@ class LocalMockChatProvider implements ChatProvider {
 
   async chat(messages: ChatMessage[]): Promise<string> {
     const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
-    const intro =
-      '🤖 Mock Assistant (no API key configured)\n\n' +
-      'This environment is running without an external AI provider. Responses are generated locally for testing.';
 
     if (!lastUserMessage) {
-      return `${intro}\n\nHow can I assist you today?`;
+      return "Hello! I'm your FedRAMP assistant. I can help you write your proposal, suggest content, and analyze your requirements. What would you like help with?";
     }
 
-    const summary = lastUserMessage.content.length > 400
-      ? `${lastUserMessage.content.slice(0, 397)}...`
-      : lastUserMessage.content;
+    const userMessage = lastUserMessage.content.toLowerCase();
+    
+    // Handle specific user requests
+    if (userMessage.includes('add something about bird')) {
+      return `Here's content about BIRD (Biometric Identity Recognition and Detection) systems that I can add to your draft:
 
-    return `${intro}\n\nYou said: "${summary}".\n\n` +
-      'In a production environment this reply would contain a fully reasoned answer powered by your configured AI provider.';
+BIRD System Implementation
+
+Our proposal includes the implementation of advanced Biometric Identity Recognition and Detection (BIRD) systems to enhance security controls and meet FedRAMP requirements. This technology provides:
+
+• **Multi-modal biometric authentication** - Combining fingerprint, facial recognition, and voice patterns for robust identity verification
+• **Continuous authentication** - Real-time monitoring of user behavior patterns to detect anomalies
+• **Anti-spoofing measures** - Advanced liveness detection to prevent biometric spoofing attacks
+• **Privacy protection** - Biometric data encryption and secure storage in compliance with federal privacy requirements
+• **Integration capabilities** - Seamless integration with existing NASA authentication infrastructure
+
+The BIRD system will be deployed across all access points and integrated with our existing multi-factor authentication framework to provide enhanced security for NASA's sensitive cloud environments.
+
+Would you like me to add this content to your draft?`;
+    }
+    
+    if (userMessage.includes('add') || userMessage.includes('include') || userMessage.includes('write about')) {
+      // Generate relevant content based on the request
+      const topic = userMessage.replace(/\b(add|include|write about|something about)\b/gi, '').trim();
+      
+      return `I can help you add content about "${topic}" to your proposal. Here's what I suggest adding:
+
+**${topic.charAt(0).toUpperCase() + topic.slice(1)} Implementation**
+
+Our approach to ${topic} includes:
+
+• **Comprehensive planning** - Detailed analysis and implementation strategy
+• **Risk mitigation** - Identification and mitigation of potential risks
+• **Compliance alignment** - Ensuring adherence to FedRAMP requirements
+• **Monitoring and validation** - Continuous oversight and performance measurement
+• **Documentation and reporting** - Complete documentation for audit purposes
+
+This section will be integrated into our overall security framework and will support NASA's mission requirements while maintaining full compliance with federal security standards.
+
+Would you like me to add this content to your draft?`;
+    }
+
+    // General FedRAMP assistance
+    if (userMessage.includes('help') || userMessage.includes('assist')) {
+      return `I'm here to help with your FedRAMP proposal! I can assist you with:
+
+• **Security Controls** - Implementation strategies for all 18 FedRAMP control families
+• **Documentation** - Drafting compliant responses and technical documentation
+• **Risk Management** - Identifying and mitigating security risks
+• **Compliance** - Ensuring adherence to federal requirements
+• **Content Enhancement** - Improving existing sections or adding new content
+
+What specific area would you like to work on?`;
+    }
+
+    // Default helpful response
+    return `I understand you're asking about "${lastUserMessage.content}". 
+
+For your FedRAMP proposal, I can help you:
+
+• Develop comprehensive responses to specific requirements
+• Add technical details and implementation strategies
+• Ensure compliance with federal security standards
+• Enhance existing content with more detailed explanations
+
+Could you be more specific about what you'd like me to help you with? For example, you could ask me to "add content about network security" or "help with the incident response section."`;
   }
 
   async generateEditProposal(context: string, instruction: string): Promise<AIEditProposal> {

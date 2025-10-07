@@ -74,8 +74,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     setError(null);
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/chat', {
+      // Call the actual API
+      const response = await fetch('/api/chat/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -96,7 +96,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: data.response,
+        content: data.data.content,
         timestamp: new Date(),
         context: currentContext,
       };
