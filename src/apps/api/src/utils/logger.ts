@@ -3,7 +3,7 @@
  * Provides the subset of functionality used by the API.
  */
 
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 

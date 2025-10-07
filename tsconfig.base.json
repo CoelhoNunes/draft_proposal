@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": true,
+    "declarationMap": true,
+    "composite": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@microtech/*": [
+        "src/packages/*/src",
+        "packages/*/src",
+        "libs/*/src",
+        "services/*/src"
+      ]
+    },
+    "outDir": "dist"
+  }
+}

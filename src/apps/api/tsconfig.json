@@ -1,26 +1,19 @@
 {
-  "extends": "../../../config/tsconfig/base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
     "baseUrl": "./src",
-    "paths": {
-      "@microtech/core": ["../../packages/core/dist"],
-      "@microtech/core/*": ["../../packages/core/dist/*"],
-      "@microtech/ai": ["../../packages/ai/dist"],
-      "@microtech/ai/*": ["../../packages/ai/dist/*"]
-    },
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "declarationMap": true,
+    "rootDir": "src",
+    "outDir": "dist",
     "noEmit": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
+  "include": ["src"],
+  "exclude": ["dist", "node_modules", "tests"],
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/ai" }
+  ]
 }

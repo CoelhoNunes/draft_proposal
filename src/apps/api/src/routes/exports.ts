@@ -3,7 +3,7 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 export async function exportRoutes(fastify: FastifyInstance) {
   // TODO: Implement export routes

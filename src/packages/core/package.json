@@ -2,12 +2,22 @@
   "name": "@microtech/core",
   "version": "1.0.0",
   "description": "Core utilities and types for MicroTech platform",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rm -rf dist",
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test \"./tests/**/*.test.mjs\""
   },
   "dependencies": {

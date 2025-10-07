@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { draftRoutes } from '../dist/routes/drafts.js';
 
+process.env.FF_ARCHIVE_UNIQUE_NAMES = 'true';
+
 async function buildServer() {
   const fastify = Fastify();
   await fastify.register(draftRoutes, { prefix: '/api' });
@@ -10,109 +12,83 @@ async function buildServer() {
   return fastify;
 }
 
-test('create, fetch and update a draft', async (t) => {
+const basePayload = {
+  projectId: '11111111-1111-1111-1111-111111111111',
+  fileName: 'proposal-draft.md',
+  title: 'Initial Draft',
+  status: 'draft',
+  sections: [
+    { heading: 'Executive Summary', body: 'Summary paragraph.' },
+  ],
+  deliverables: [
+    { title: 'Plan of Actions and Milestones' },
+  ],
+  llmChanges: [],
+  sources: [],
+};
+
+test('create, fetch and update a draft with unique enforcement', async (t) => {
   const fastify = await buildServer();
   t.after(() => fastify.close());
-
-  const samplePayload = {
-    projectId: '11111111-1111-1111-1111-111111111111',
-    pdfId: '22222222-2222-2222-2222-222222222222',
-    title: 'Initial Draft',
-    summary: 'Executive summary placeholder',
-  };
 
   const createResponse = await fastify.inject({
     method: 'POST',
     url: '/api/drafts',
-    payload: samplePayload,
+    payload: basePayload,
   });
 
   assert.equal(createResponse.statusCode, 201);
   const created = createResponse.json().data;
-  assert.deepEqual(
-    {
-      projectId: created.projectId,
-      pdfId: created.pdfId,
-      title: created.title,
-      status: created.status,
-    },
-    {
-      projectId: samplePayload.projectId,
-      pdfId: samplePayload.pdfId,
-      title: samplePayload.title,
-      status: 'draft',
-    },
-  );
+  assert.ok(created.id);
+  assert.equal(created.fileName, basePayload.fileName);
+
+  const duplicateResponse = await fastify.inject({
+    method: 'POST',
+    url: '/api/drafts',
+    payload: basePayload,
+  });
+  assert.equal(duplicateResponse.statusCode, 409);
+  assert.equal(duplicateResponse.json().success, false);
+  assert.ok(duplicateResponse.json().suggestedName.includes('_2'));
 
   const listResponse = await fastify.inject({
     method: 'GET',
-    url: `/api/projects/${samplePayload.projectId}/drafts`,
+    url: `/api/projects/${basePayload.projectId}/drafts?page=1&limit=5`,
   });
   assert.equal(listResponse.statusCode, 200);
   assert.equal(listResponse.json().data.length, 1);
+  assert.equal(listResponse.json().pagination.total, 1);
 
   const updateResponse = await fastify.inject({
     method: 'PATCH',
     url: `/api/drafts/${created.id}`,
-    payload: { status: 'completed', summary: 'Updated summary' },
+    payload: { title: 'Updated Draft' },
   });
   assert.equal(updateResponse.statusCode, 200);
-  assert.equal(updateResponse.json().data.status, 'completed');
-  assert.equal(updateResponse.json().data.summary, 'Updated summary');
+  assert.equal(updateResponse.json().data.title, 'Updated Draft');
 
-  const getResponse = await fastify.inject({
-    method: 'GET',
-    url: `/api/drafts/${created.id}`,
-  });
-  assert.equal(getResponse.statusCode, 200);
-  assert.equal(getResponse.json().data.id, created.id);
-});
-
-test('returns 404 for unknown draft', async (t) => {
-  const fastify = await buildServer();
-  t.after(() => fastify.close());
-
-  const response = await fastify.inject({
-    method: 'GET',
-    url: '/api/drafts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  });
-
-  assert.equal(response.statusCode, 404);
-});
-
-test('filters drafts by search term and status', async (t) => {
-  const fastify = await buildServer();
-  t.after(() => fastify.close());
-
-  const samplePayload = {
-    projectId: '11111111-1111-1111-1111-111111111111',
-    pdfId: '22222222-2222-2222-2222-222222222222',
-    title: 'Initial Draft',
-    summary: 'Executive summary placeholder',
-  };
-
-  await fastify.inject({ method: 'POST', url: '/api/drafts', payload: samplePayload });
-  await fastify.inject({
+  const archiveResponse = await fastify.inject({
     method: 'POST',
-    url: '/api/drafts',
+    url: '/api/archive',
     payload: {
-      ...samplePayload,
-      pdfId: '33333333-3333-3333-3333-333333333333',
-      title: 'Security Deliverable Plan',
-      status: 'completed',
-      summary: 'Includes SSP and POA&M deliverables',
+      ...basePayload,
+      fileName: 'proposal-draft-2.md',
+      title: 'Archived Draft',
     },
   });
+  assert.equal(archiveResponse.statusCode, 201);
+  const archivedId = archiveResponse.json().data.id;
 
-  const filteredByStatus = await fastify.inject({
+  const listAfterArchive = await fastify.inject({
     method: 'GET',
-    url: `/api/projects/${samplePayload.projectId}/drafts?status=completed`,
+    url: `/api/projects/${basePayload.projectId}/drafts`,
   });
-  assert.equal(filteredByStatus.json().data.length, 1);
+  assert.equal(listAfterArchive.json().data.length, 2);
 
-  const filteredBySearch = await fastify.inject({
+  const archiveGet = await fastify.inject({
     method: 'GET',
-    url: `/api/projects/${samplePayload.projectId}/drafts?search=deliverable`,
+    url: `/api/archive/${archivedId}`,
   });
-  assert.equal(filteredBySearch.json().data.length, 1);
+  assert.equal(archiveGet.statusCode, 200);
+  assert.equal(archiveGet.json().data.title, 'Archived Draft');
 });

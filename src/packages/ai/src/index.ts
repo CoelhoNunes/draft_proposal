@@ -6,8 +6,8 @@
  */
 
 // Services
-export * from './services/ChatService';
+export * from './services/ChatService.js';
 
 // Prompts
-export * from './prompts/proposal.prompts';
-export * from './prompts/recruiting.prompts';
+export * from './prompts/proposal.prompts.js';
+export * from './prompts/recruiting.prompts.js';

@@ -65,6 +65,30 @@ pnpm dev
 pnpm lint
 ```
 
+### Monorepo testing
+To build shared packages and run the API tests with internal workspace dependencies resolved:
+
+```bash
+pnpm install
+pnpm -w -r build
+pnpm --filter microtech-api test
+```
+
+> These steps compile the shared `@microtech/*` packages into their `dist/` outputs before executing the Fastify test suite.
+
+### Python virtual environment
+All Python-based ingestion or tooling must execute from the local `.venv` virtual environment. The setup script creates it automatically, but you can initialise it manually:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Example: run a maintenance script
+.venv/bin/python -m your_script
+```
+
+> ℹ️  CI pipelines also create `.venv` before invoking any Python commands to guarantee consistent environments.
+
 ## 📁 Project Structure
 
 ```
@@ -145,6 +169,9 @@ microtech-platform/
 - **Interactive Checklists**: Auto-generated from document analysis
 - **Real-time Collaboration**: Multi-user editing with change tracking
 - **Export Capabilities**: PDF/DOCX export with professional formatting
+- **Draft Gating**: AI suggestions only update the editor when you press the explicit “Add to draft” button.
+- **Resizable Assistant Panel**: Drag the top-center handle horizontally or vertically to size the chat panel without overlapping workspace columns.
+- **Archive Reliability**: Saved drafts enforce project-level unique file names (feature flagged) and can be reopened from the archive drawer.
 
 ### Recruiting Workflow
 - **Candidate Analysis**: Resume vs. job description matching

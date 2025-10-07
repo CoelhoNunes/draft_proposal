@@ -3,9 +3,9 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { config } from '../config';
-import { logger } from '../utils/logger';
-import { sign as signJwt, verify as verifyJwt } from '../utils/jwt';
+import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
+import { sign as signJwt, verify as verifyJwt } from '../utils/jwt.js';
 
 interface AuthenticatedRequest extends FastifyRequest {
   user?: {

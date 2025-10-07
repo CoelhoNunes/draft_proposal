@@ -18,25 +18,29 @@ import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 // Internal modules
-import { config } from './config';
-import { logger } from './utils/logger';
-import { errorHandler } from './middleware/errorHandler';
-import { authMiddleware } from './middleware/auth';
+import { config } from './config/index.js';
+import { logger } from './utils/logger.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { authMiddleware } from './middleware/auth.js';
 
 // API Route handlers
-import { workspaceRoutes } from './routes/workspaces';
-import { documentRoutes } from './routes/documents';
-import { checklistRoutes } from './routes/checklist';
-import { changeRoutes } from './routes/changes';
-import { chatRoutes } from './routes/chat';
-import { exportRoutes } from './routes/exports';
-import { uploadRoutes } from './routes/upload';
-import { draftRoutes } from './routes/drafts';
-import { ragDebugRoutes } from './routes/ragDebug';
-import { healthRoutes } from './routes/health';
+import { workspaceRoutes } from './routes/workspaces.js';
+import { documentRoutes } from './routes/documents.js';
+import { checklistRoutes } from './routes/checklist.js';
+import { changeRoutes } from './routes/changes.js';
+import { chatRoutes } from './routes/chat.js';
+import { exportRoutes } from './routes/exports.js';
+import { uploadRoutes } from './routes/upload.js';
+import { draftRoutes } from './routes/drafts.js';
+import { ragDebugRoutes } from './routes/ragDebug.js';
+import { healthRoutes } from './routes/health.js';
+import { telemetryRoutes } from './routes/telemetry.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function createServer() {
   const fastify = Fastify({
@@ -141,6 +145,7 @@ export async function createServer() {
   await fastify.register(chatRoutes, { prefix: '/api/chat' });
   await fastify.register(exportRoutes, { prefix: '/api/exports' });
   await fastify.register(uploadRoutes, { prefix: '/api/upload' });
+  await fastify.register(telemetryRoutes, { prefix: '/api/telemetry' });
   if (config.features.archiveV2) {
     await fastify.register(draftRoutes, { prefix: '/api' });
   }

@@ -6,13 +6,13 @@
  */
 
 // Types
-export * from './types';
+export * from './types/index.js';
 
 // Validators
-export * from './validators';
+export * from './validators/index.js';
 
 // Utilities
-export * from './utils';
+export * from './utils/index.js';
 
 // Validation primitives
-export { z, ZodError, type Schema } from './z';
+export { z, ZodError, type Schema } from './z/index.js';

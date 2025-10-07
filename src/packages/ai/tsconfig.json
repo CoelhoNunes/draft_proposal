@@ -1,22 +1,12 @@
 {
-  "extends": "../../../config/tsconfig/base.json",
+  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "declaration": true,
-    "declarationMap": true,
-    "noEmit": false,
-    "baseUrl": ".",
-    "paths": {
-      "@microtech/core": ["../core/dist"],
-      "@microtech/core/*": ["../core/dist/*"]
-    }
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*"],
-  "references": [
-    { "path": "../core" }
-  ],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
+  "include": ["src"],
+  "references": [{ "path": "../core" }],
+  "exclude": ["dist", "node_modules", "tests"]
 }

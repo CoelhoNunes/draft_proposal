@@ -3,7 +3,7 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 export async function documentRoutes(fastify: FastifyInstance) {
   // TODO: Implement document routes

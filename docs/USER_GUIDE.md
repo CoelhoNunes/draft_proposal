@@ -76,6 +76,8 @@ The Proposal workspace features a 3-column layout optimized for proposal managem
 - **Live Editing**: Real-time editing with auto-save
 - **Collaboration**: Multiple users can edit simultaneously
 - **Version Control**: Track changes and maintain document history
+- **Add-to-Draft Control**: AI-generated text appears in the Draft Intelligence panel and is only inserted into the editor after selecting **Add to draft**.
+- **Checklist Intelligence**: Use “Draft from checklist” to compose structured content mapped to deliverables without auto-inserting it.
 
 #### Right Column - Change Log
 - **Activity Tracking**: Record of all changes and edits
@@ -86,14 +88,17 @@ The Proposal workspace features a 3-column layout optimized for proposal managem
 ### 2. AI Chat Integration
 - **Context-Aware**: AI understands your current workspace and document
 - **Live Suggestions**: Real-time suggestions for improvements
-- **Edit Application**: Apply AI suggestions directly to your draft
+- **Explicit Draft Updates**: Select an AI response, then press the **Add to draft** button beneath the chat input to insert content into the editor.
 - **Change Tracking**: All AI edits are recorded in the change log
+- **Resizable Panel**: Drag the top-center handle horizontally or vertically to resize the assistant panel while keeping workspace columns visible.
 
 ### 3. Document Management
 - **Upload**: Drag and drop or click to upload documents
 - **Supported Formats**: PDF, DOCX, TXT files
 - **Processing**: Automatic document analysis and checklist generation
 - **Export**: Export drafts to PDF or other formats
+- **Archive Saves**: Use **Save Draft** to persist the current document into the archive. File names must be unique per project when the feature flag is enabled.
+- **Open Archived Runs**: The archive drawer lists saved drafts—select one to reload its content into the editor along with deliverables and change history.
 
 ## Recruiting Workspace
 

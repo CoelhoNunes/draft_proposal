@@ -3,7 +3,7 @@
  */
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 export async function ragDebugRoutes(fastify: FastifyInstance) {
   fastify.get('/debug', async (request: FastifyRequest, reply: FastifyReply) => {

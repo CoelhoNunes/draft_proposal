@@ -3,12 +3,12 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { ChatService } from '@microtech/ai';
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 export async function uploadRoutes(fastify: FastifyInstance) {
   // Analyze a PDF using the LLM (simple text passthrough for now)

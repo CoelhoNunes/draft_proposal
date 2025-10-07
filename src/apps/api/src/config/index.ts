@@ -4,6 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 function loadEnvFile(filePath: string): boolean {
   if (!fs.existsSync(filePath)) {
@@ -31,11 +32,13 @@ function loadEnvFile(filePath: string): boolean {
 }
 
 // Load environment variables from .env automatically (project root and API dir)
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+
 const candidatePaths = [
   path.resolve(process.cwd(), '.env'),
-  path.resolve(__dirname, '../../../../.env'), // project root when running from dist
-  path.resolve(__dirname, '../../../.env'), // fallback relative
-  path.resolve(__dirname, '../../.env'),
+  path.resolve(currentDir, '../../../../.env'), // project root when running from dist
+  path.resolve(currentDir, '../../../.env'), // fallback relative
+  path.resolve(currentDir, '../../.env'),
 ];
 
 for (const candidate of candidatePaths) {
@@ -43,6 +46,14 @@ for (const candidate of candidatePaths) {
     break;
   }
 }
+
+const parseFeatureFlag = (...values: (string | undefined)[]) => {
+  const candidate = values.find((value) => value !== undefined);
+  if (candidate === undefined) {
+    return process.env.NODE_ENV !== 'production';
+  }
+  return candidate.toLowerCase() === 'true';
+};
 
 const rawConfig = {
   server: {
@@ -79,7 +90,7 @@ const rawConfig = {
   },
   ai: {
     provider: process.env.AI_PROVIDER || 'openai',
-    apiKey: process.env.OPENAI_KEY || process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
     baseUrl: process.env.AI_BASE_URL,
     model: process.env.AI_MODEL || process.env.LLM_MODEL || 'gpt-4',
     temperature: parseFloat(process.env.AI_TEMPERATURE || process.env.LLM_TEMP || '0.3'),
@@ -123,12 +134,24 @@ export const config = {
     strongRag: rawConfig.rag.enabled,
     archiveV2: (process.env.FEATURE_FF_ARCHIVE_V2 || '').toLowerCase() === 'true',
     chatGptStyle: (process.env.FEATURE_FF_CHATGPT_STYLE || '').toLowerCase() === 'true',
+    chatAddToDraftGated: parseFeatureFlag(
+      process.env.FF_CHAT_ADD_TO_DRAFT_GATED,
+      process.env.FEATURE_FF_CHAT_ADD_TO_DRAFT_GATED,
+    ),
+    chatResizeToggle: parseFeatureFlag(
+      process.env.FF_CHAT_RESIZE_TOGGLE,
+      process.env.FEATURE_FF_CHAT_RESIZE_TOGGLE,
+    ),
+    archiveUniqueNames: parseFeatureFlag(
+      process.env.FF_ARCHIVE_UNIQUE_NAMES,
+      process.env.FEATURE_FF_ARCHIVE_UNIQUE_NAMES,
+    ),
   },
 };
 
 // Validate required environment variables
 if (!config.ai.apiKey && config.ai.provider !== 'custom') {
-  console.warn('⚠️  AI_API_KEY not set - AI features will be disabled');
+  console.warn('⚠️  OPENAI_API_KEY not set - AI features will be disabled');
 }
 
 if (!config.azure.storageAccountName && process.env.NODE_ENV === 'production') {

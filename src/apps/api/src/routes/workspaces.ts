@@ -4,7 +4,7 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z, CreateWorkspaceSchema, UpdateWorkspaceSchema } from '@microtech/core';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 const workspaceParamsSchema = z.object({
   id: z.string().uuid(),

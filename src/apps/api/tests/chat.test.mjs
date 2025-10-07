@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 
-process.env.OPENAI_KEY = '';
+process.env.OPENAI_API_KEY = '';
 
 const { chatRoutes } = await import('../dist/routes/chat.js');
 const { errorHandler } = await import('../dist/middleware/errorHandler.js');
@@ -31,7 +31,7 @@ test('POST /api/chat/send returns a mock response when no API key is configured'
   const body = response.json();
   assert.equal(body.success, true);
   assert.equal(body.data.role, 'assistant');
-  assert.match(body.data.content, /Mock Assistant/);
+  assert.match(body.data.content, /FedRAMP proposal/i);
 });
 
 test('POST /api/chat/edit returns a structured mock edit proposal', async (t) => {

@@ -3,15 +3,14 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Send, 
-  Bot, 
-  User, 
-  Minimize2, 
-  Maximize2,
+import {
+  Send,
+  Bot,
+  User,
   MessageSquare,
   Settings,
-  X
+  X,
+  GripHorizontal,
 } from 'lucide-react';
 // Simple components
 const Card = ({ children, className }: any) => <div className={`border rounded-lg bg-white shadow-lg ${className || ''}`}>{children}</div>;
@@ -31,6 +30,8 @@ const Button = ({ children, className, onClick, disabled, size, ...props }: any)
 const Input = ({ className, ...props }: any) => <input className={`px-3 py-2 border rounded ${className || ''}`} {...props} />;
 const Badge = ({ children, className, variant }: any) => <span className={`px-2 py-1 text-xs rounded bg-gray-100 ${className || ''}`}>{children}</span>;
 import { useChatStore } from '@/store/chatStore';
+import { useDraftStore } from '@/store/draftStore';
+import { featureFlags } from '@/design/featureFlags';
 // Simple utilities
 const cn = (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' ');
 const formatDate = (date: Date) => date.toLocaleTimeString();
@@ -42,9 +43,13 @@ interface ChatDockProps {
 
 export function ChatDock({ workspaceId, tab }: ChatDockProps) {
   const [message, setMessage] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [dimensions, setDimensions] = useState({ width: 380, height: 460 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const resizeHandleRef = useRef<HTMLButtonElement>(null);
+
   const {
     isOpen,
     messages,
@@ -54,6 +59,7 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
     sendMessage,
     setContext
   } = useChatStore();
+  const { addToDraft } = useDraftStore();
 
   // Update context when workspace or tab changes
   useEffect(() => {
@@ -67,9 +73,10 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
 
   const handleSendMessage = async () => {
     if (!message.trim() || isLoading) return;
-    
+
     const messageToSend = message.trim();
     setMessage('');
+    console.info('[chat-dock]', { event: 'chat_send', characters: messageToSend.length, tab });
     await sendMessage(messageToSend);
   };
 
@@ -102,13 +109,127 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
     setMessage(prompt);
   };
 
+  useEffect(() => {
+    if (!featureFlags.chatResizeToggle) return;
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const deltaX = event.clientX - dragStartRef.current.x;
+      const deltaY = event.clientY - dragStartRef.current.y;
+      const nextWidth = Math.min(
+        Math.max(dragStartRef.current.width + deltaX, 300),
+        520,
+      );
+      const nextHeight = Math.min(
+        Math.max(dragStartRef.current.height + deltaY, 320),
+        720,
+      );
+      setDimensions({ width: nextWidth, height: nextHeight });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+      document.body.style.cursor = '';
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'nwse-resize';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      if (!isDragging) {
+        document.body.style.cursor = '';
+      }
+    };
+  }, [isDragging]);
+
   if (!isOpen) {
     return null;
   }
 
+  const handleAddToDraft = () => {
+    if (!selectedMessageId) {
+      return;
+    }
+    const selectedMessage = messages.find((message) => message.id === selectedMessageId);
+    if (!selectedMessage) {
+      return;
+    }
+    addToDraft({
+      text: selectedMessage.content,
+      summary: 'Chat assistant suggestion',
+      sourceMessageId: selectedMessage.id,
+    });
+    console.info('[chat-dock]', {
+      event: 'add_to_draft_clicked',
+      messageId: selectedMessage.id,
+      characters: selectedMessage.content.length,
+    });
+    setSelectedMessageId(null);
+  };
+
+  const handleResizePointerDown = (event: React.MouseEvent) => {
+    if (!featureFlags.chatResizeToggle) {
+      return;
+    }
+    event.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+  };
+
+  const handleResizeKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!featureFlags.chatResizeToggle) return;
+    const step = 24;
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setDimensions((prev) => ({ ...prev, height: Math.max(prev.height - step, 320) }));
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setDimensions((prev) => ({ ...prev, height: Math.min(prev.height + step, 720) }));
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setDimensions((prev) => ({ ...prev, width: Math.max(prev.width - step, 300) }));
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setDimensions((prev) => ({ ...prev, width: Math.min(prev.width + step, 520) }));
+    }
+  };
+
+  const isAddDisabled = !selectedMessageId;
+
   return (
-    <div className="fixed bottom-4 right-4 w-96 max-h-[600px] z-50">
-      <Card className="shadow-2xl border-2">
+    <div
+      className="fixed bottom-4 right-4 z-50"
+      style={{ width: `${dimensions.width}px`, maxWidth: '90vw' }}
+    >
+      <Card className="shadow-2xl border-2 relative" style={{ height: `${dimensions.height}px` }}>
+        <button
+          ref={resizeHandleRef}
+          type="button"
+          role="separator"
+          aria-orientation="horizontal"
+          tabIndex={0}
+          onKeyDown={handleResizeKey}
+          onMouseDown={handleResizePointerDown}
+          className={`absolute left-1/2 -translate-x-1/2 -top-3 flex items-center justify-center rounded-full border border-gray-200 bg-white p-1 shadow focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            featureFlags.chatResizeToggle ? 'cursor-grab' : 'cursor-not-allowed'
+          }`}
+          aria-label="Resize assistant panel"
+        >
+          <GripHorizontal className="h-4 w-4 text-gray-500" />
+        </button>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -119,13 +240,6 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
               </Badge>
             </div>
             <div className="flex items-center space-x-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-              >
-                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -141,7 +255,7 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
           {/* Messages */}
           <div className={cn(
             'overflow-y-auto border-b',
-            isExpanded ? 'h-96' : 'h-64'
+            'h-[60%]'
           )}>
             <div className="p-4 space-y-4">
               {messages.length === 0 ? (
@@ -163,27 +277,38 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
                   >
                     {msg.role !== 'user' && (
                       <div className="flex-shrink-0">
-                        {msg.role === 'ai' ? (
+                        {msg.role === 'assistant' ? (
                           <Bot className="h-6 w-6 text-blue-500" />
                         ) : (
                           <MessageSquare className="h-6 w-6 text-gray-500" />
                         )}
                       </div>
                     )}
-                    
-                    <div className={cn(
-                      'max-w-[80%] rounded-lg px-3 py-2 text-sm',
-                      msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : msg.role === 'ai'
-                        ? 'bg-muted'
-                        : 'bg-blue-50 text-blue-800 text-center'
-                    )}>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (msg.role !== 'assistant') return;
+                        setSelectedMessageId((current) => (current === msg.id ? null : msg.id));
+                      }}
+                      className={cn(
+                        'max-w-[80%] rounded-lg px-3 py-2 text-sm text-left transition-shadow focus:outline-none',
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : msg.role === 'assistant'
+                          ? 'bg-muted'
+                          : 'bg-blue-50 text-blue-800',
+                        selectedMessageId === msg.id && featureFlags.chatAddToDraftGated
+                          ? 'ring-2 ring-blue-400'
+                          : 'hover:shadow-md'
+                      )}
+                      aria-pressed={selectedMessageId === msg.id}
+                    >
                       <p>{msg.content}</p>
                       <p className="text-xs opacity-70 mt-1">
                         {formatDate(msg.timestamp)}
                       </p>
-                    </div>
+                    </button>
 
                     {msg.role === 'user' && (
                       <div className="flex-shrink-0">
@@ -242,7 +367,7 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
           )}
 
           {/* Input */}
-          <div className="p-4">
+          <div className="p-4 space-y-2">
             <div className="flex space-x-2">
               <Input
                 value={message}
@@ -260,6 +385,24 @@ export function ChatDock({ workspaceId, tab }: ChatDockProps) {
                 <Send className="h-4 w-4" />
               </Button>
             </div>
+            {featureFlags.chatAddToDraftGated && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  Select an AI response to enable Add to draft.
+                </span>
+                <Button
+                  onClick={handleAddToDraft}
+                  disabled={isAddDisabled}
+                  size="sm"
+                  className={cn(
+                    'bg-blue-600 text-white px-3 py-1 rounded',
+                    isAddDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+                  )}
+                >
+                  Add to draft
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

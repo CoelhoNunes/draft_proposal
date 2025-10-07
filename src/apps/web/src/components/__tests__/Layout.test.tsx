@@ -1,25 +1,26 @@
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
+import { StaticRouter } from 'react-router-dom/server';
 import { Layout } from '../Layout';
+import { renderToString } from 'react-dom/server';
 
 const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <BrowserRouter>
+  return renderToString(
+    <StaticRouter location="/">
       {component}
-    </BrowserRouter>
+    </StaticRouter>
   );
 };
 
 describe('Layout', () => {
   it('renders the MicroTech brand', () => {
-    renderWithRouter(<Layout><div>Test content</div></Layout>);
-    expect(screen.getByText('MicroTech')).toBeInTheDocument();
+    const markup = renderWithRouter(<Layout><div>Test content</div></Layout>);
+    expect(markup).toContain('MicroTech');
   });
 
   it('renders navigation links', () => {
-    renderWithRouter(<Layout><div>Test content</div></Layout>);
-    expect(screen.getByText('Home')).toBeInTheDocument();
-    expect(screen.getByText('Proposal')).toBeInTheDocument();
-    expect(screen.getByText('Recruiting')).toBeInTheDocument();
+    const markup = renderWithRouter(<Layout><div>Test content</div></Layout>);
+    expect(markup).toContain('Home');
+    expect(markup).toContain('Proposals');
+    expect(markup).toContain('Recruiting');
   });
 });
