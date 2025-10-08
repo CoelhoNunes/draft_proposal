@@ -1,0 +1,84 @@
+# ========================================
+# BASH/WSL/Git Bash Commands:
+# ========================================
+
+# 1. Clone the repository
+git clone <your-repo-url>
+cd fedramp-rfp-assistant
+
+# 2. Copy your environment file
+cp env.example .env
+# Edit .env with your API keys
+
+# 3. Install dependencies
+pnpm install --frozen-lockfile
+
+# 4. Build workspace packages
+pnpm -w -r build
+
+# 5. Start development servers
+bash scripts/dev_run.sh
+
+# Alternative - Manual start:
+# Navigate to project root
+cd fedramp-rfp-assistant
+
+# Install dependencies
+pnpm install --frozen-lockfile
+
+# Build packages
+pnpm -w -r build
+
+# Start API server (Terminal 1)
+cd src/apps/api && pnpm dev
+
+# Start Web server (Terminal 2)
+cd src/apps/web && pnpm dev
+
+# ========================================
+# POWERSHELL Commands (Windows):
+# ========================================
+
+# 1. Clone the repository
+git clone <your-repo-url>
+Set-Location fedramp-rfp-assistant
+
+# 2. Copy your environment file
+Copy-Item env.example .env
+# Edit .env with your API keys
+
+# 3. Install dependencies
+pnpm install --frozen-lockfile
+
+# 4. Build workspace packages
+pnpm -w -r build
+
+# 5. Start development servers (use bash)
+bash scripts/dev_run.sh
+
+# Alternative - Manual start in PowerShell:
+# Navigate to project root
+Set-Location fedramp-rfp-assistant
+
+# Install dependencies
+pnpm install --frozen-lockfile
+
+# Build packages
+pnpm -w -r build
+
+# Start API server (Terminal 1)
+Set-Location src\apps\api; pnpm dev
+
+# Start Web server (Terminal 2)
+Set-Location src\apps\web; pnpm dev
+
+# ========================================
+# QUICK ONE-LINERS FOR POWERSHELL:
+# ========================================
+
+# Option 1: Use bash for everything
+bash -c "cd fedramp-rfp-assistant && pnpm install --frozen-lockfile && pnpm -w -r build && bash scripts/dev_run.sh"
+
+# Option 2: PowerShell with separate terminals
+# Terminal 1: Set-Location fedramp-rfp-assistant; pnpm install --frozen-lockfile; pnpm -w -r build; Set-Location src\apps\api; pnpm dev
+# Terminal 2: Set-Location fedramp-rfp-assistant\src\apps\web; pnpm dev
