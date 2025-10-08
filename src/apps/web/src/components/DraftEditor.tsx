@@ -88,8 +88,9 @@ const SectionCard = ({
         onClick={(event) => onSelection(section.id, (event.target as HTMLTextAreaElement).selectionStart ?? null)}
         onKeyUp={(event) => onSelection(section.id, (event.target as HTMLTextAreaElement).selectionStart ?? null)}
         onSelect={(event) => onSelection(section.id, (event.target as HTMLTextAreaElement).selectionStart ?? null)}
-        className="min-h-[180px] w-full resize-y rounded border border-gray-200 p-3 text-sm leading-relaxed focus:border-blue-500 focus:ring-blue-500"
+        className="min-h-[500px] w-full resize-none rounded border border-gray-200 p-3 text-sm leading-relaxed focus:border-blue-500 focus:ring-blue-500"
         placeholder="Add draft content for this section"
+        rows={25}
       />
     </div>
   );
@@ -271,30 +272,36 @@ export function DraftEditor({ projectId }: DraftEditorProps) {
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto p-4 min-h-0">
         {isPreview ? (
           <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: previewHtml }} />
         ) : (
-          <div className="space-y-4">
-            {sections.length === 0 && (
-              <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
-                No sections yet. Import a PDF or ask the assistant to generate an outline.
-              </div>
-            )}
-            {sections.map((section) => (
-              <SectionCard
-                key={section.id}
-                section={section}
-                onHeadingChange={handleHeadingChange}
-                onContentChange={handleContentChange}
-                onSelection={handleSelection}
-                highlightRange={
-                  highlightedSectionId === section.id
-                    ? highlightRanges[section.id] ?? null
-                    : null
-                }
+          <div className="h-full">
+            <div className="h-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <textarea
+                value=""
+                onChange={(e) => console.log('Content changed:', e.target.value)}
+                className="h-full w-full resize-none rounded border border-gray-200 p-3 text-sm leading-relaxed focus:border-blue-500 focus:ring-blue-500"
+                placeholder="Start typing your draft here... Import a PDF or ask the assistant to generate content."
+                rows={50}
               />
-            ))}
+            </div>
+            {sections.length > 0 && (
+              sections.map((section) => (
+                <SectionCard
+                  key={section.id}
+                  section={section}
+                  onHeadingChange={handleHeadingChange}
+                  onContentChange={handleContentChange}
+                  onSelection={handleSelection}
+                  highlightRange={
+                    highlightedSectionId === section.id
+                      ? highlightRanges[section.id] ?? null
+                      : null
+                  }
+                />
+              ))
+            )}
           </div>
         )}
 

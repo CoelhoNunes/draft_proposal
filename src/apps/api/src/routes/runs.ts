@@ -36,12 +36,12 @@ interface HighlightAnchor {
 interface LlmChange {
   id: string;
   runId: string;
-  sectionId: string | null;
+  sectionId: string | null | undefined;
   summary: string;
   insertedText: string;
   createdAt: string;
   approvedByUser: boolean;
-  highlightAnchor: HighlightAnchor | null;
+  highlightAnchor: HighlightAnchor | null | undefined;
   sourceMessageId?: string;
 }
 
@@ -152,7 +152,7 @@ const updateRunSchema = z.object({
     .array(
       z.object({
         id: z.string().uuid(),
-        sectionId: z.string().uuid().nullable(),
+        sectionId: z.string().uuid().optional(),
         summary: z.string(),
         insertedText: z.string(),
         createdAt: z.string(),
@@ -162,7 +162,7 @@ const updateRunSchema = z.object({
             startOffset: z.number().int().nonnegative(),
             endOffset: z.number().int().nonnegative(),
           })
-          .nullable(),
+          .optional(),
       }),
     )
     .optional(),
@@ -179,7 +179,7 @@ const deliverableCollectionSchema = z.object({
 });
 
 const commitChangeSchema = z.object({
-  sectionId: z.string().uuid().nullable(),
+  sectionId: z.string().uuid().optional(),
   insertedText: z.string().min(1),
   summary: z.string().min(1),
   anchor: z
@@ -187,7 +187,6 @@ const commitChangeSchema = z.object({
       startOffset: z.number().int().nonnegative(),
       endOffset: z.number().int().nonnegative(),
     })
-    .nullable()
     .optional(),
   sourceMessageId: z.string().optional(),
   suggestionId: z.string().optional(),
@@ -200,8 +199,8 @@ const suggestionStatusSchema = z.object({
 
 const suggestionRequestSchema = z.object({
   prompt: z.string().min(1).max(4000),
-  sectionId: z.string().uuid().optional().nullable(),
-  cursor: z.number().int().nonnegative().optional(),
+  sectionId: z.string().uuid().optional().default(undefined),
+  cursor: z.number().int().nonnegative().optional().default(undefined),
 });
 
 const exportRequestSchema = z.object({});
@@ -530,7 +529,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
       run.runName = updates.runName;
     }
     if (updates.status) {
-      run.status = updates.status;
+      run.status = updates.status as 'draft' | 'exported';
     }
     if (updates.sections) {
       run.sections = updates.sections.map((section) => ({ ...section }));
@@ -539,6 +538,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
       run.deliverables = updates.deliverables.map((deliverable) => ({
         ...deliverable,
         runId: run.id,
+        status: deliverable.status as 'todo' | 'in_progress' | 'done',
         description: deliverable.description ?? '',
         checklistItems: (deliverable.checklistItems || []).map((item) => ({
           ...item,
@@ -609,7 +609,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
       return { success: false, error: 'Deliverable not found.' };
     }
     if (payload.status) {
-      deliverable.status = payload.status;
+      deliverable.status = payload.status as 'todo' | 'in_progress' | 'done';
     }
     if (payload.checklistItem) {
       deliverable.checklistItems = deliverable.checklistItems.map((item) =>
@@ -738,7 +738,7 @@ export async function runsRoutes(fastify: FastifyInstance) {
         return { success: false, error: 'Suggestion not found for message.' };
       }
       entry.suggestions = entry.suggestions.map((suggestion) =>
-        suggestion.id === payload.suggestionId ? { ...suggestion, status: payload.status } : suggestion,
+        suggestion.id === payload.suggestionId ? { ...suggestion, status: payload.status as 'pending' | 'inserted' | 'dismissed' } : suggestion,
       );
       run.updatedAt = new Date().toISOString();
       ensureArchive(run);

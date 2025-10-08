@@ -23,14 +23,8 @@ pnpm install --frozen-lockfile
 echo "==> Build workspace"
 pnpm -w -r build
 
-# Start API + Web concurrently (fall back if root script missing)
-if pnpm -s run | grep -q "\"dev\""; then
-  pnpm dev
-else
-  (pnpm --filter "./apps/api" dev &)
-  (pnpm --filter "./apps/web" dev &)
-  wait
-fi
+echo "==> Starting dev servers..."
+pnpm dev
 
 # HOW TO RUN:
 #   WSL/Linux/macOS:   chmod +x scripts/dev_run.sh && ./scripts/dev_run.sh

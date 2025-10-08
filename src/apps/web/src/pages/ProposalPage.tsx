@@ -438,51 +438,52 @@ export function ProposalPage() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] bg-gray-50">
-      <div className="px-6 py-8">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Proposal workspace</h1>
-            <p className="text-sm text-gray-500">
-              Deliverables, draft, and AI collaboration work together. The assistant only updates the draft once you confirm.
-            </p>
-            {run?.runName && (
-              <p className="text-xs text-gray-400">Active run: {run.runName}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={handleFileInputChange}
-            />
-            <Button
-              className="bg-blue-600 text-white"
-              onClick={handleUploadClick}
-              disabled={isUploading}
-            >
-              {isUploading ? 'Processing…' : 'Upload PDF'}
-            </Button>
-          </div>
-        </header>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="px-6 py-6 flex-shrink-0">
+          <header className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900">Proposal workspace</h1>
+              <p className="text-sm text-gray-500">
+                Deliverables, draft, and AI collaboration work together. The assistant only updates the draft once you confirm.
+              </p>
+              {run?.runName && (
+                <p className="text-xs text-gray-400">Active run: {run.runName}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
+              <Button
+                className="bg-blue-600 text-white"
+                onClick={handleUploadClick}
+                disabled={isUploading}
+              >
+                {isUploading ? 'Processing…' : 'Upload PDF'}
+              </Button>
+            </div>
+          </header>
 
-        {uploadError && (
-          <div className="mb-4 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-            <AlertTriangle className="mt-0.5 h-4 w-4" />
-            <span>{uploadError}</span>
-          </div>
-        )}
-        {uploadSuccess && (
-          <div className="mb-4 rounded border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
-            {uploadSuccess}
-          </div>
-        )}
+          {uploadError && (
+            <div className="mb-3 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+              <AlertTriangle className="mt-0.5 h-4 w-4" />
+              <span>{uploadError}</span>
+            </div>
+          )}
+          {uploadSuccess && (
+            <div className="mb-3 rounded border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+              {uploadSuccess}
+            </div>
+          )}
+        </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-          <aside className="flex flex-col gap-4" aria-label="Deliverables column">
-            <section className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex gap-6 px-6 flex-1 min-h-0" style={{ minWidth: '1200px' }}>
+          <aside className="flex flex-col gap-4 h-full overflow-y-auto" style={{ width: '280px' }} aria-label="Deliverables column">
+            <section className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-900">Deliverables</h2>
                 <Button
@@ -630,28 +631,30 @@ export function ProposalPage() {
                     </li>
                   ))}
                   {archiveItems.length === 0 && (
-                    <li className="rounded border border-dashed border-gray-200 px-3 py-6 text-center text-gray-500">
+                    <div className="rounded border border-dashed border-gray-200 px-3 py-6 text-center text-gray-500">
                       No saved drafts yet.
-                    </li>
+                    </div>
                   )}
                 </ul>
               )}
             </section>
           </aside>
 
-          <section className="min-h-[720px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="Draft column">
+          <section className="flex flex-col h-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" style={{ flex: '1' }} aria-label="Draft column">
             <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
               <h2 className="text-sm font-semibold text-gray-900">Draft</h2>
             </div>
             <DraftEditor workspaceId={WORKSPACE_ID} projectId={PROJECT_ID} />
           </section>
 
-          <section className="flex min-h-[720px] flex-col rounded-lg border border-gray-200 bg-white shadow-sm" aria-label="Assistant column">
-            <div className="flex border-b bg-gray-50">
+          <section className="flex flex-col h-full rounded-lg border border-gray-200 bg-white shadow-sm" style={{ width: '360px' }} aria-label="Assistant column">
+            <div className="flex gap-2 p-2 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
               <button
                 type="button"
-                className={`flex-1 px-4 py-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                  activeTab === 'changes' ? 'border-b-2 border-blue-600 text-blue-700' : 'text-gray-500'
+                className={`flex-1 px-4 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                  activeTab === 'changes' 
+                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border border-blue-500' 
+                    : 'bg-gradient-to-br from-blue-400 to-blue-500 text-white border border-blue-400 hover:from-blue-500 hover:to-blue-600'
                 }`}
                 onClick={() => setActiveTab('changes')}
                 role="tab"
@@ -661,8 +664,10 @@ export function ProposalPage() {
               </button>
               <button
                 type="button"
-                className={`flex-1 px-4 py-3 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                  activeTab === 'chat' ? 'border-b-2 border-blue-600 text-blue-700' : 'text-gray-500'
+                className={`flex-1 px-4 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
+                  activeTab === 'chat' 
+                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border border-blue-500' 
+                    : 'bg-gradient-to-br from-blue-400 to-blue-500 text-white border border-blue-400 hover:from-blue-500 hover:to-blue-600'
                 }`}
                 onClick={() => setActiveTab('chat')}
                 role="tab"
@@ -741,6 +746,5 @@ export function ProposalPage() {
           </section>
         </div>
       </div>
-    </div>
   );
 }

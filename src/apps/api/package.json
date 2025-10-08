@@ -5,8 +5,8 @@
   "scripts": {
     "prebuild": "tsc -b --clean",
     "build": "tsc -b",
-    "dev": "node server.js",
-    "start": "node server.js",
+    "dev": "tsc -b && node dist/index.js",
+    "start": "node dist/index.js",
     "pretest": "pnpm -w -r build",
     "test": "node --test \"./tests/**/*.test.mjs\""
   },

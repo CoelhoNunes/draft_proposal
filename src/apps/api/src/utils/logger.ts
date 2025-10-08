@@ -42,11 +42,28 @@ function createConsoleLogger(bindings: Record<string, unknown>, level: LogLevel)
     const payloadObject =
       typeof payload === 'string' || payload === undefined ? undefined : (payload as Record<string, unknown>);
     const finalMessage = typeof payload === 'string' ? payload : message;
+    
+    // Filter out circular references and non-serializable objects
+    const safePayload: Record<string, unknown> = {};
+    if (payloadObject) {
+      for (const [key, value] of Object.entries(payloadObject)) {
+        if (value !== null && typeof value === 'object' && ('socket' in value || 'req' in value || 'res' in value)) {
+          continue; // Skip request/response/socket objects
+        }
+        try {
+          JSON.stringify(value); // Test if serializable
+          safePayload[key] = value;
+        } catch {
+          // Skip non-serializable values
+        }
+      }
+    }
+    
     const entry: Record<string, unknown> = {
       time,
       level: logLevel,
       ...bindings,
-      ...(payloadObject ?? {}),
+      ...safePayload,
     };
     if (finalMessage !== undefined) {
       entry.msg = finalMessage;

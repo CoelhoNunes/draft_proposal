@@ -174,21 +174,19 @@ export async function createServer() {
   return fastify;
 }
 
-// Start server if this file is run directly
-if (require.main === module) {
-  (async () => {
-    try {
-      const server = await createServer();
-      await server.listen({
-        port: config.server.port,
-        host: config.server.host,
-      });
+// Start server (ES module compatible)
+(async () => {
+  try {
+    const server = await createServer();
+    await server.listen({
+      port: config.server.port,
+      host: config.server.host,
+    });
 
-      logger.info(`🚀 Server running at ${config.server.scheme}://${config.server.host}:${config.server.port}`);
-      logger.info(`📚 API documentation available at ${config.server.scheme}://${config.server.host}:${config.server.port}/docs`);
-    } catch (error) {
-      logger.error({ error }, 'Failed to start server');
-      process.exit(1);
-    }
-  })();
-}
+    logger.info(`🚀 Server running at ${config.server.scheme}://${config.server.host}:${config.server.port}`);
+    logger.info(`📚 API documentation available at ${config.server.scheme}://${config.server.host}:${config.server.port}/docs`);
+  } catch (error) {
+    logger.error({ error }, 'Failed to start server');
+    process.exit(1);
+  }
+})();
